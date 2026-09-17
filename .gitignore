@@ -1,0 +1,38 @@
+# Secrets and local settings
+local.settings.json
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+*.p12
+*.key
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Azure Functions build output
+.python_packages/
+bin/
+obj/
+
+# IDE and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated reports and documents
+*.docx
+*.pdf
+*.html
+
+# Logs and temporary output
+*.log
+*.tmp
