@@ -74,6 +74,55 @@ def collect_autopilot_devices(client: GraphClient) -> list[dict[str, Any]]:
     return records
 
 
+def _policy_inventory_record(policy: dict[str, Any], policy_type: str) -> dict[str, Any]:
+    policy_id = policy["id"]
+    role_scope_tags = policy.get("roleScopeTagIds") or []
+    if isinstance(role_scope_tags, list):
+        role_scope_tags = ",".join(str(tag) for tag in role_scope_tags)
+    return {
+        "key": policy_id,
+        "policyId": policy_id,
+        "policyName": policy.get("displayName", ""),
+        "policyType": policy_type,
+        "odataType": policy.get("@odata.type", ""),
+        "description": policy.get("description") or "",
+        "platforms": policy.get("platforms") or "",
+        "technologies": policy.get("technologies") or "",
+        "isAssigned": policy.get("isAssigned"),
+        "roleScopeTagIds": role_scope_tags,
+        "createdDateTime": policy.get("createdDateTime"),
+        "lastModifiedDateTime": policy.get("lastModifiedDateTime"),
+    }
+
+
+def collect_compliance_policy_inventory(client: GraphClient) -> list[dict[str, Any]]:
+    """Return every compliance policy definition, including policies with no status rows."""
+    return [
+        _policy_inventory_record(policy, "Compliance Policy")
+        for policy in client.get_paged(f"{GRAPH_BASE}/deviceManagement/deviceCompliancePolicies")
+    ]
+
+
+def collect_configuration_profile_inventory(client: GraphClient) -> list[dict[str, Any]]:
+    """Return every configuration profile definition, including profiles with no status rows."""
+    return [
+        _policy_inventory_record(policy, "Configuration Profile")
+        for policy in client.get_paged(f"{GRAPH_BASE}/deviceManagement/deviceConfigurations")
+    ]
+
+
+def collect_update_ring_inventory(client: GraphClient) -> list[dict[str, Any]]:
+    """Return every Windows Update for Business ring definition."""
+    profiles = client.get_paged(
+        f"{GRAPH_BASE}/deviceManagement/deviceConfigurations",
+        params={"$filter": "isof('microsoft.graph.windowsUpdateForBusinessConfiguration')"},
+    )
+    return [
+        _policy_inventory_record(policy, "Windows Update Ring")
+        for policy in profiles
+    ]
+
+
 def collect_app_deployment_status(client: GraphClient) -> list[dict[str, Any]]:
     """Per-device install status for every mobile app managed in Intune.
 

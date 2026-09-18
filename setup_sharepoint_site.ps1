@@ -2,10 +2,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$SiteUrl,
-
     [Parameter(Mandatory = $true)]
     [string]$TenantId,
-
     [Parameter(Mandatory = $true)]
     [string]$ClientId
 )
@@ -105,6 +103,9 @@ $urls = @{
     Configuration = Get-ListUrl "Intune Config Profiles"
     Patches = Get-ListUrl "Intune Patch Compliance"
     ApplicationInventory = Get-ListUrl "Intune Application Inventory"
+    ComplianceInventory = Get-ListUrl "Intune Compliance Policy Inventory"
+    ConfigurationInventory = Get-ListUrl "Intune Configuration Profile Inventory"
+    UpdateRingInventory = Get-ListUrl "Intune Update Ring Inventory"
     Autopilot = Get-ListUrl "Intune Autopilot"
     DeviceRisks = Get-ListUrl "Intune Device Risks"
     HealthSummary = Get-ListUrl "Intune Health Summary"
@@ -160,10 +161,13 @@ $pageUrls.Application = New-OperationsPage "Application-Management" "Application
 $pageUrls.Policy = New-OperationsPage "Policy-Management" "Policy Management" "Configuration, compliance, and security policy deployment posture." @(
     @{ Title = "Configuration"; Description = "Endpoint configuration delivery."; Links = @(
         @{ Title = "Configuration Profiles"; Url = $urls.Configuration; Description = "Profile deployment status by device." },
-        @{ Title = "Compliance Policies"; Url = $urls.Compliance; Description = "Compliance policy outcomes." }
+        @{ Title = "Configuration Profile Inventory"; Url = $urls.ConfigurationInventory; Description = "Every configuration profile definition, including profiles with no status rows." },
+        @{ Title = "Compliance Policies"; Url = $urls.Compliance; Description = "Compliance policy outcomes." },
+        @{ Title = "Compliance Policy Inventory"; Url = $urls.ComplianceInventory; Description = "Every compliance policy definition." }
     ) },
     @{ Title = "Security"; Description = "Security configuration posture."; Links = @(
-        @{ Title = "Security Baselines"; Url = $pageUrls.Baselines; Description = "Baseline deployment and conflicts." }
+        @{ Title = "Security Baselines"; Url = $pageUrls.Baselines; Description = "Baseline deployment and conflicts." },
+        @{ Title = "Update Ring Inventory"; Url = $urls.UpdateRingInventory; Description = "Every Windows Update ring definition." }
     ) }
 )
 
@@ -207,6 +211,7 @@ Add-ReportingListPart $pageUrls.Patch "Intune Patch Compliance"
 Add-ReportingListPart $pageUrls.Vulnerability "Intune Device Risks"
 Add-ReportingListPart $pageUrls.Analytics "Intune Health Summary"
 Add-ReportingListPart $pageUrls.DriverAutomation "Intune Devices"
+Add-ReportingListPart $pageUrls.Policy "Intune Configuration Profile Inventory"
 
 Set-PnPHomePage -RootFolderRelativeUrl "SitePages/Endpoint-Intelligence-Hub.aspx"
 

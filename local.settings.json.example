@@ -16,5 +16,8 @@
     "SP_LIST_AUTOPILOT_ID": "<list-id>",
     "SP_LIST_DEVICE_RISKS_ID": "<list-id>",
     "SP_LIST_HEALTH_SUMMARY_ID": "<list-id>"
+    ,"SP_LIST_COMPLIANCE_INVENTORY_ID": "<list-id>"
+    ,"SP_LIST_CONFIGURATION_INVENTORY_ID": "<list-id>"
+    ,"SP_LIST_UPDATE_RING_INVENTORY_ID": "<list-id>"
   }
 }

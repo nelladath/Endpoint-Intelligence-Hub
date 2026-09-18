@@ -2,10 +2,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$SiteUrl,
-
     [Parameter(Mandatory = $true)]
     [string]$TenantId,
-
     [Parameter(Mandatory = $true)]
     [string]$ClientId
 )
@@ -58,6 +56,18 @@ $listDefinitions = [ordered]@{
     "Intune Health Summary" = @(
         "category", "metricName", "metricValue", "percentage", "status", "description"
     )
+    "Intune Compliance Policy Inventory" = @(
+        "policyId", "policyName", "policyType", "odataType", "description", "platforms",
+        "technologies", "isAssigned", "roleScopeTagIds", "createdDateTime", "lastModifiedDateTime"
+    )
+    "Intune Configuration Profile Inventory" = @(
+        "policyId", "policyName", "policyType", "odataType", "description", "platforms",
+        "technologies", "isAssigned", "roleScopeTagIds", "createdDateTime", "lastModifiedDateTime"
+    )
+    "Intune Update Ring Inventory" = @(
+        "policyId", "policyName", "policyType", "odataType", "description", "platforms",
+        "technologies", "isAssigned", "roleScopeTagIds", "createdDateTime", "lastModifiedDateTime"
+    )
 }
 
 $listIds = [ordered]@{}
@@ -89,3 +99,6 @@ Write-Host "SP_LIST_APP_INVENTORY_ID=$($listIds['Intune Application Inventory'])
 Write-Host "SP_LIST_AUTOPILOT_ID=$($listIds['Intune Autopilot'])"
 Write-Host "SP_LIST_DEVICE_RISKS_ID=$($listIds['Intune Device Risks'])"
 Write-Host "SP_LIST_HEALTH_SUMMARY_ID=$($listIds['Intune Health Summary'])"
+Write-Host "SP_LIST_COMPLIANCE_INVENTORY_ID=$($listIds['Intune Compliance Policy Inventory'])"
+Write-Host "SP_LIST_CONFIGURATION_INVENTORY_ID=$($listIds['Intune Configuration Profile Inventory'])"
+Write-Host "SP_LIST_UPDATE_RING_INVENTORY_ID=$($listIds['Intune Update Ring Inventory'])"

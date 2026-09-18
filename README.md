@@ -2,7 +2,7 @@
 
 Endpoint Intelligence Hub is a centralized operational portal for Microsoft Intune, Windows Autopilot, AI-assisted driver automation, patch management, application delivery, device compliance, endpoint health, security risk, hardware intelligence, and reporting analytics.
 
-A Python Azure Function collects current tenant data through Microsoft Graph, calculates health and risk metrics, and synchronizes nine SharePoint lists. Modern SharePoint pages embed those lists into a navigable operations hub.
+A Python Azure Function collects current tenant data through Microsoft Graph, calculates health and risk metrics, and synchronizes twelve SharePoint lists. Modern SharePoint pages embed those lists into a navigable operations hub.
 
 ## What It Collects
 
@@ -13,6 +13,7 @@ A Python Azure Function collects current tenant data through Microsoft Graph, ca
 - Per-device and per-user application installation outcomes
 - Windows Autopilot registration, enrollment, group tag, profile assignment, and last contact
 - Compliance-policy and configuration-profile deployment outcomes
+- Complete compliance-policy, configuration-profile, and Windows Update ring definitions, including policies with no deployment-status rows
 - Device risk scores and actionable risk reasons
 - Fleet-wide health score and operational distributions
 
@@ -54,7 +55,7 @@ The SharePoint lists are a **current-state mirror**, not a historical warehouse.
 | `sharepoint_sync.py` | SharePoint keyed upsert and stale-record deletion |
 | `config.py` | Required environment-variable settings |
 | `error_catalog.py` | Known application deployment errors and recommendations |
-| `setup_sharepoint_lists.ps1` | Idempotent creation/repair of the nine SharePoint lists |
+| `setup_sharepoint_lists.ps1` | Idempotent creation/repair of the twelve SharePoint lists |
 | `setup_sharepoint_site.ps1` | Site branding, modern pages, navigation, views, libraries, and embedded list web parts |
 | `local.settings.json.example` | Secret-free local configuration template |
 | `host.json` | Azure Functions host configuration |
@@ -188,8 +189,11 @@ The script creates or repairs these lists:
 7. `Intune Devices`
 8. `Intune Device Risks`
 9. `Intune Health Summary`
+10. `Intune Compliance Policy Inventory`
+11. `Intune Configuration Profile Inventory`
+12. `Intune Update Ring Inventory`
 
-Copy the nine list IDs printed at the end. The script is idempotent and preserves existing data.
+Copy the twelve list IDs printed at the end. The script is idempotent and preserves existing data.
 
 ## 5. Provision the SharePoint Experience
 
@@ -283,6 +287,9 @@ Required settings:
 | `SP_LIST_AUTOPILOT_ID` | Autopilot list ID |
 | `SP_LIST_DEVICE_RISKS_ID` | Device risks list ID |
 | `SP_LIST_HEALTH_SUMMARY_ID` | Health summary list ID |
+| `SP_LIST_COMPLIANCE_INVENTORY_ID` | Complete compliance-policy definition list ID |
+| `SP_LIST_CONFIGURATION_INVENTORY_ID` | Complete configuration-profile definition list ID |
+| `SP_LIST_UPDATE_RING_INVENTORY_ID` | Complete Windows Update ring definition list ID |
 
 Find the site ID:
 
@@ -310,7 +317,10 @@ az functionapp config appsettings set `
     SP_LIST_APP_INVENTORY_ID=<list-id> `
     SP_LIST_AUTOPILOT_ID=<list-id> `
     SP_LIST_DEVICE_RISKS_ID=<list-id> `
-    SP_LIST_HEALTH_SUMMARY_ID=<list-id>
+    SP_LIST_HEALTH_SUMMARY_ID=<list-id> `
+    SP_LIST_COMPLIANCE_INVENTORY_ID=<list-id> `
+    SP_LIST_CONFIGURATION_INVENTORY_ID=<list-id> `
+    SP_LIST_UPDATE_RING_INVENTORY_ID=<list-id>
 ```
 
 Do not print secrets in tickets, chat, logs, or screenshots.
@@ -371,7 +381,7 @@ Expected response:
 
 - `reportName`: `Endpoint Intelligence Hub`
 - `endpointHealth`: current score and rating
-- `syncResults`: nine list results
+- `syncResults`: twelve list results
 - One `runId` shared by the completed synchronization
 
 Treat function keys as secrets.
@@ -417,7 +427,7 @@ After deployment:
 4. Confirm all SharePoint lists contain one common `LastRunId`.
 5. Confirm `Intune Health Summary` contains `Overall Endpoint Health Score`.
 6. Confirm device rows include encryption, storage, threat, OS currency, inactivity, and risk fields.
-7. Confirm Autopilot and Application Inventory contain data when the tenant has source records.
+7. Confirm Autopilot, Application Inventory, Compliance Policy Inventory, Configuration Profile Inventory, and Update Ring Inventory contain data when the tenant has source records.
 8. Open the SharePoint home page and verify navigation and embedded lists.
 9. Review Application Insights for exceptions and throttling retries.
 

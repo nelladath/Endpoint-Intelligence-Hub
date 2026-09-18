@@ -43,6 +43,9 @@ class Settings:
             "autopilot": _required("SP_LIST_AUTOPILOT_ID"),
             "device_risks": _required("SP_LIST_DEVICE_RISKS_ID"),
             "health_summary": _required("SP_LIST_HEALTH_SUMMARY_ID"),
+            "compliance_inventory": _required("SP_LIST_COMPLIANCE_INVENTORY_ID"),
+            "configuration_inventory": _required("SP_LIST_CONFIGURATION_INVENTORY_ID"),
+            "update_ring_inventory": _required("SP_LIST_UPDATE_RING_INVENTORY_ID"),
         }
 
 

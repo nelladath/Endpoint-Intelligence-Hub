@@ -10,10 +10,13 @@ from intune_collectors import (
     collect_app_deployment_status,
     collect_application_inventory,
     collect_autopilot_devices,
+    collect_compliance_policy_inventory,
     collect_compliance_policy_status,
     collect_config_profile_status,
+    collect_configuration_profile_inventory,
     collect_managed_devices,
     collect_patch_compliance_status,
+    collect_update_ring_inventory,
 )
 from sharepoint_sync import sync_records
 
@@ -33,8 +36,11 @@ def run_pipeline() -> dict[str, object]:
 
     apps = collect_app_deployment_status(client)
     compliance_policies = collect_compliance_policy_status(client)
+    compliance_inventory = collect_compliance_policy_inventory(client)
     config_profiles = collect_config_profile_status(client)
+    configuration_inventory = collect_configuration_profile_inventory(client)
     patch_compliance = collect_patch_compliance_status(client)
+    update_ring_inventory = collect_update_ring_inventory(client)
     devices = collect_managed_devices(client)
     application_inventory = collect_application_inventory(client)
     autopilot = collect_autopilot_devices(client)
@@ -76,6 +82,15 @@ def run_pipeline() -> dict[str, object]:
         ),
         "healthSummary": sync_records(
             client, site_id, list_ids["health_summary"], health_metrics, run_id
+        ),
+        "complianceInventory": sync_records(
+            client, site_id, list_ids["compliance_inventory"], compliance_inventory, run_id
+        ),
+        "configurationInventory": sync_records(
+            client, site_id, list_ids["configuration_inventory"], configuration_inventory, run_id
+        ),
+        "updateRingInventory": sync_records(
+            client, site_id, list_ids["update_ring_inventory"], update_ring_inventory, run_id
         ),
     }
     overall_health = next(
