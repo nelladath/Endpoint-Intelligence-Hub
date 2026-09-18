@@ -33,5 +33,13 @@ $html=@"
 </div>
 "@
 Add-PnPPageTextPart -Page $page -Section 1 -Column 1 -Text $html | Out-Null
+Add-PnPPageSection -Page $page -SectionTemplate OneColumn | Out-Null
+$healthList = Get-PnPList -Identity "Intune Health Summary"
+$healthView = Get-PnPView -List "Intune Health Summary" -Identity "All Items"
+Add-PnPPageWebPart -Page $page -DefaultWebPartType List -Section 2 -Column 1 -WebPartProperties @{
+    isDocumentLibrary = $false
+    selectedListId = $healthList.Id.ToString()
+    selectedViewId = $healthView.Id.ToString()
+} | Out-Null
 Set-PnPPage -Identity $pageName -Title "Endpoint Intelligence Hub" -HeaderLayoutType ColorBlock -CommentsEnabled:$false -Publish | Out-Null
 Write-Output "Home dashboard repaired: $SiteUrl/SitePages/$pageName"
