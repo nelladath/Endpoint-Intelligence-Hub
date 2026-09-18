@@ -76,7 +76,7 @@ function Get-ListUrl {
 
 function Set-ReportingView {
     param([string]$ListTitle, [string[]]$Fields)
-    Set-PnPView -List $ListTitle -Identity "All Items" -Fields $Fields | Out-Null
+    Set-PnPView -List $ListTitle -Identity "All Items" -Fields $Fields -Values @{ RowLimit = [uint32]999; Paged = $true } | Out-Null
     Set-PnPList -Identity $ListTitle -ListExperience NewExperience | Out-Null
 }
 
