@@ -96,6 +96,55 @@ function Add-ReportingListPart {
     Set-PnPPage -Identity $pageName -CommentsEnabled:$false -Publish | Out-Null
 }
 
+function Add-HubDashboardPart {
+    param([string]$PageUrl)
+    $pageName = $PageUrl.Split('/')[-1]
+    $page = Get-PnPPage -Identity $pageName
+    $summaryItems = @(Get-PnPListItem -List "Intune Health Summary" -PageSize 1000 -Fields "metricName", "metricValue", "percentage", "status")
+    $metrics = @{}
+    foreach ($item in $summaryItems) {
+        $fields = $item.FieldValues
+        $metrics[[string]$fields.metricName] = $fields
+    }
+    function Get-Metric([string]$Name, [string]$Fallback = "0") {
+        if ($metrics.ContainsKey($Name)) { return [string]$metrics[$Name].metricValue }
+        return $Fallback
+    }
+    function Get-Percent([string]$Name) {
+        if ($metrics.ContainsKey($Name)) { return [double]$metrics[$Name].percentage }
+        return 0
+    }
+    function Get-Bar([string]$Name, [string]$Label) {
+        $value = Get-Percent $Name
+        $width = [math]::Max(0, [math]::Min(100, $value))
+        return "<div style='margin:8px 0'><div style='display:flex;justify-content:space-between;font-weight:600'><span>$Label</span><span>$([math]::Round($value,1))%</span></div><div style='background:#e5e7eb;border-radius:6px;height:12px'><div style='background:#2563eb;border-radius:6px;height:12px;width:$width%'></div></div></div>"
+    }
+    $score = Get-Metric "Overall Endpoint Health Score"
+    $scoreStatus = if ($metrics.ContainsKey("Overall Endpoint Health Score")) { $metrics["Overall Endpoint Health Score"].status } else { "Unknown" }
+    $risks = @(Get-PnPListItem -List "Intune Device Risks" -PageSize 1000 -Fields "riskLevel", "riskScore")
+    $highRisk = @($risks | Where-Object { $_.FieldValues.riskLevel -eq "High" }).Count
+    $mediumRisk = @($risks | Where-Object { $_.FieldValues.riskLevel -eq "Medium" }).Count
+    $html = @"
+<div style='font-family:Segoe UI,Arial;color:#1f2937'>
+<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0'>
+<div style='background:#0f3d5e;color:white;padding:18px;border-radius:10px'><div style='font-size:12px;text-transform:uppercase;opacity:.8'>Overall Endpoint Health</div><div style='font-size:36px;font-weight:700'>$score<span style='font-size:16px'>/100</span></div><div>$scoreStatus</div></div>
+<div style='background:#ecfdf5;border-left:5px solid #16a34a;padding:18px;border-radius:8px'><div style='font-size:12px;text-transform:uppercase;color:#166534'>High/Medium Risk</div><div style='font-size:30px;font-weight:700;color:#166534'>$($highRisk + $mediumRisk)</div><div>High: $highRisk | Medium: $mediumRisk</div></div>
+<div style='background:#fff7ed;border-left:5px solid #ea580c;padding:18px;border-radius:8px'><div style='font-size:12px;text-transform:uppercase;color:#9a3412'>Critical Storage</div><div style='font-size:30px;font-weight:700;color:#9a3412'>$(Get-Metric 'Critical Storage (<2%)')</div><div>Devices below 2% free</div></div>
+<div style='background:#eff6ff;border-left:5px solid #2563eb;padding:18px;border-radius:8px'><div style='font-size:12px;text-transform:uppercase;color:#1d4ed8'>Autopilot Registered</div><div style='font-size:30px;font-weight:700;color:#1d4ed8'>$(Get-Metric 'Autopilot Registered')</div><div>Current registrations</div></div>
+</div>
+<div style='display:grid;grid-template-columns:1fr 1fr;gap:24px'>
+<div><h3 style='margin-bottom:12px'>Weighted Health Components</h3>$(Get-Bar 'Compliance (25%)' 'Compliance (25%)')$(Get-Bar 'Encryption (20%)' 'Encryption (20%)')$(Get-Bar 'Patch/OS currency (20%)' 'Patch/OS currency (20%)')</div>
+<div><h3 style='margin-bottom:12px'>Coverage and Risk Signals</h3>$(Get-Bar 'Threat-free (15%)' 'Threat-free (15%)')$(Get-Bar 'Device activity (10%)' 'Device activity (10%)')$(Get-Bar 'Management health (10%)' 'Management health (10%)')</div>
+</div>
+<div style='margin-top:16px;padding:12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px'><strong>Operational focus:</strong> $(Get-Metric 'Non-Compliant Devices') non-compliant devices, $(Get-Metric 'Unencrypted Devices') unencrypted devices, $(Get-Metric 'Stale / Inactive Devices') stale devices, $(Get-Metric 'Orphaned Devices') orphaned devices, $(Get-Metric 'Low Storage (<10%)') devices below 10% free storage, and $(Get-Metric 'Applications') applications tracked.</div>
+</div>
+"@
+    $sectionNumber = $page.Sections.Count + 1
+    Add-PnPPageSection -Page $page -SectionTemplate OneColumn | Out-Null
+    Add-PnPPageTextPart -Page $page -Section $sectionNumber -Column 1 -Text $html | Out-Null
+    Set-PnPPage -Identity $pageName -CommentsEnabled:$false -Publish | Out-Null
+}
+
 $urls = @{
     Devices = Get-ListUrl "Intune Devices"
     Apps = Get-ListUrl "Intune Apps"
@@ -200,6 +249,7 @@ $pageUrls.Home = New-OperationsPage "Endpoint-Intelligence-Hub" "Endpoint Intell
 )
 
 Add-ReportingListPart $pageUrls.Home "Intune Health Summary"
+Add-HubDashboardPart $pageUrls.Home
 Add-ReportingListPart $pageUrls.Device "Intune Devices"
 Add-ReportingListPart $pageUrls.Autopilot "Intune Autopilot"
 Add-ReportingListPart $pageUrls.Hardware "Intune Devices"
