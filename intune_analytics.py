@@ -164,9 +164,13 @@ def build_health_metrics(
     )
     encrypted = sum(device.get("isEncrypted") is True for device in devices)
     patch_healthy = sum(device.get("patchStatus") in {"Current", "Recent"} for device in devices)
+    known_threat_states = {"secured", "lowseverity", "mediumseverity", "highseverity"}
+    known_threat = sum(
+        (device.get("threatState") or "unknown").lower() in known_threat_states
+        for device in devices
+    )
     threat_free = sum(
-        (device.get("threatState") or "unknown").lower()
-        not in {"lowseverity", "mediumseverity", "highseverity"}
+        (device.get("threatState") or "unknown").lower() == "secured"
         for device in devices
     )
     active = sum(not device.get("isStale") for device in devices)
@@ -195,7 +199,17 @@ def build_health_metrics(
             "description": description,
         })
 
-    add("Health Score", "Overall Endpoint Health Score", overall_score, overall_score, overall_status, "Weighted endpoint health score out of 100.")
+    add(
+        "Health Score",
+        "Overall Endpoint Health Score",
+        overall_score,
+        overall_score,
+        overall_status,
+        "Weighted score for the current managed-device scope: "
+        "Compliance 25%, Encryption 20%, Patch/OS currency 20%, Threat-free 15%, "
+        "Device activity 10%, Management health 10%. "
+        f"Scope: {total} managed devices returned by Microsoft Graph.",
+    )
     component_labels = {
         "compliance": "Compliance (25%)",
         "encryption": "Encryption (20%)",
@@ -204,8 +218,31 @@ def build_health_metrics(
         "deviceActivity": "Device activity (10%)",
         "managementHealth": "Management health (10%)",
     }
+    component_counts = {
+        "compliance": compliance_healthy,
+        "encryption": encrypted,
+        "patchCurrency": patch_healthy,
+        "threatFree": threat_free,
+        "deviceActivity": active,
+        "managementHealth": managed,
+    }
+    component_descriptions = {
+        "compliance": "Devices with complianceState compliant or configManager.",
+        "encryption": "Devices where isEncrypted is true.",
+        "patchCurrency": "Devices classified Current or Recent by OS build.",
+        "threatFree": "Devices explicitly reporting secured; unknown threat telemetry is not counted as threat-free.",
+        "deviceActivity": "Devices synced within the 30-day activity window.",
+        "managementHealth": "Devices whose managementState is managed.",
+    }
     for key, value in components.items():
-        add("Health Component", component_labels[key], round(value * 100, 1), value * 100)
+        add(
+            "Health Component",
+            component_labels[key],
+            round(value * 100, 1),
+            value * 100,
+            "",
+            f"{component_counts[key]} of {total} managed devices. {component_descriptions[key]}",
+        )
 
     counts = {
         "Total Devices": total,
@@ -220,13 +257,21 @@ def build_health_metrics(
         "Low Storage (<10%)": sum(device.get("storagePercentFree") is not None and device["storagePercentFree"] < 10 for device in devices),
         "High/Medium Risk Devices": sum(device.get("riskLevel") in {"High", "Medium"} for device in devices),
         "Jailbroken / Rooted": sum(_as_bool(device.get("jailBroken")) for device in devices),
+        "Threat Telemetry Coverage": known_threat,
         "Autopilot Registered": len(autopilot),
         "Applications": len(applications),
         "Win32 Applications": sum(app.get("appType") == "Win32" for app in applications),
         "Store Applications": sum(app.get("appType") == "Microsoft Store" for app in applications),
     }
     for name, count in counts.items():
-        add("Fleet", name, count, ratio(count) * 100 if name not in {"Autopilot Registered", "Applications", "Win32 Applications", "Store Applications"} else None)
+        add(
+            "Fleet",
+            name,
+            count,
+            ratio(count) * 100 if name not in {"Autopilot Registered", "Applications", "Win32 Applications", "Store Applications"} else None,
+            "",
+            f"{count} of {total} managed devices." if name not in {"Autopilot Registered", "Applications", "Win32 Applications", "Store Applications"} else "Current tenant inventory count.",
+        )
 
     distributions = {
         "Operating System": Counter(device.get("operatingSystem") or "Unknown" for device in devices),

@@ -114,10 +114,15 @@ function Add-HubDashboardPart {
         if ($metrics.ContainsKey($Name)) { return [double]$metrics[$Name].percentage }
         return 0
     }
+    function Get-Description([string]$Name) {
+        if ($metrics.ContainsKey($Name)) { return [string]$metrics[$Name].description }
+        return ""
+    }
     function Get-Bar([string]$Name, [string]$Label) {
         $value = Get-Percent $Name
         $width = [math]::Max(0, [math]::Min(100, $value))
-        return "<div style='margin:8px 0'><div style='display:flex;justify-content:space-between;font-weight:600'><span>$Label</span><span>$([math]::Round($value,1))%</span></div><div style='background:#e5e7eb;border-radius:6px;height:12px'><div style='background:#2563eb;border-radius:6px;height:12px;width:$width%'></div></div></div>"
+        $color = if ($value -ge 95) { "#22c55e" } elseif ($value -ge 80) { "#eab308" } else { "#ef4444" }
+        return "<div style='margin:10px 0'><div style='display:flex;justify-content:space-between;font-weight:600;color:#e6edf3;font-size:14px'><span>$Label</span><span>$([math]::Round($value,1))%</span></div><div style='background:#1e2a37;border-radius:6px;height:14px'><div style='background:$color;border-radius:6px;height:14px;width:$width%'></div></div><div style='color:#8b98a5;font-size:11px;margin-top:3px'>$(Get-Description $Name)</div></div>"
     }
     $score = Get-Metric "Overall Endpoint Health Score"
     $scoreStatus = if ($metrics.ContainsKey("Overall Endpoint Health Score")) { $metrics["Overall Endpoint Health Score"].status } else { "Unknown" }
@@ -125,18 +130,19 @@ function Add-HubDashboardPart {
     $highRisk = @($risks | Where-Object { $_.FieldValues.riskLevel -eq "High" }).Count
     $mediumRisk = @($risks | Where-Object { $_.FieldValues.riskLevel -eq "Medium" }).Count
     $html = @"
-<div style='font-family:Segoe UI,Arial;color:#1f2937'>
-<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0'>
-<div style='background:#0f3d5e;color:white;padding:18px;border-radius:10px'><div style='font-size:12px;text-transform:uppercase;opacity:.8'>Overall Endpoint Health</div><div style='font-size:36px;font-weight:700'>$score<span style='font-size:16px'>/100</span></div><div>$scoreStatus</div></div>
-<div style='background:#ecfdf5;border-left:5px solid #16a34a;padding:18px;border-radius:8px'><div style='font-size:12px;text-transform:uppercase;color:#166534'>High/Medium Risk</div><div style='font-size:30px;font-weight:700;color:#166534'>$($highRisk + $mediumRisk)</div><div>High: $highRisk | Medium: $mediumRisk</div></div>
-<div style='background:#fff7ed;border-left:5px solid #ea580c;padding:18px;border-radius:8px'><div style='font-size:12px;text-transform:uppercase;color:#9a3412'>Critical Storage</div><div style='font-size:30px;font-weight:700;color:#9a3412'>$(Get-Metric 'Critical Storage (<2%)')</div><div>Devices below 2% free</div></div>
-<div style='background:#eff6ff;border-left:5px solid #2563eb;padding:18px;border-radius:8px'><div style='font-size:12px;text-transform:uppercase;color:#1d4ed8'>Autopilot Registered</div><div style='font-size:30px;font-weight:700;color:#1d4ed8'>$(Get-Metric 'Autopilot Registered')</div><div>Current registrations</div></div>
+<div style='font-family:Segoe UI,Arial;background:#0f1720;color:#e6edf3;padding:24px;border:1px solid #2a3742;border-radius:10px'>
+<div style='font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#8b98a5;margin-bottom:6px'>Endpoint Intelligence Hub | Current scope: $(Get-Metric 'Total Devices') managed devices</div>
+<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:12px 0'>
+<div style='background:#17212b;border:1px solid #2a3742;padding:18px;border-radius:10px'><div style='font-size:12px;text-transform:uppercase;color:#8b98a5'>Overall Endpoint Health</div><div style='font-size:42px;font-weight:700;color:#e6edf3'>$score<span style='font-size:18px;color:#8b98a5'>/100</span></div><div style='display:inline-block;background:#14532d;color:#4ade80;padding:4px 12px;border-radius:16px;font-weight:600'>$scoreStatus</div></div>
+<div style='background:#17212b;border:1px solid #2a3742;padding:18px;border-radius:10px'><div style='font-size:12px;text-transform:uppercase;color:#8b98a5'>Risk-flagged devices</div><div style='font-size:30px;font-weight:700;color:#fbbf24'>$($highRisk + $mediumRisk)</div><div style='color:#8b98a5'>High risk (score 4+): $highRisk | Medium risk (score 2-3): $mediumRisk</div></div>
+<div style='background:#17212b;border:1px solid #2a3742;padding:18px;border-radius:10px'><div style='font-size:12px;text-transform:uppercase;color:#8b98a5'>Critical storage</div><div style='font-size:30px;font-weight:700;color:#fb923c'>$(Get-Metric 'Critical Storage (<2%)')</div><div style='color:#8b98a5'>Managed devices below 2% free space</div></div>
+<div style='background:#17212b;border:1px solid #2a3742;padding:18px;border-radius:10px'><div style='font-size:12px;text-transform:uppercase;color:#8b98a5'>Autopilot registered</div><div style='font-size:30px;font-weight:700;color:#60a5fa'>$(Get-Metric 'Autopilot Registered')</div><div style='color:#8b98a5'>Current Autopilot registrations</div></div>
 </div>
-<div style='display:grid;grid-template-columns:1fr 1fr;gap:24px'>
-<div><h3 style='margin-bottom:12px'>Weighted Health Components</h3>$(Get-Bar 'Compliance (25%)' 'Compliance (25%)')$(Get-Bar 'Encryption (20%)' 'Encryption (20%)')$(Get-Bar 'Patch/OS currency (20%)' 'Patch/OS currency (20%)')</div>
-<div><h3 style='margin-bottom:12px'>Coverage and Risk Signals</h3>$(Get-Bar 'Threat-free (15%)' 'Threat-free (15%)')$(Get-Bar 'Device activity (10%)' 'Device activity (10%)')$(Get-Bar 'Management health (10%)' 'Management health (10%)')</div>
+<div style='display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:18px'>
+<div><h3 style='margin:0 0 12px;color:#e6edf3'>Weighted health components</h3>$(Get-Bar 'Compliance (25%)' 'Compliance (25%)')$(Get-Bar 'Encryption (20%)' 'Encryption (20%)')$(Get-Bar 'Patch/OS currency (20%)' 'Patch/OS currency (20%)')</div>
+<div><h3 style='margin:0 0 12px;color:#e6edf3'>Coverage and risk signals</h3>$(Get-Bar 'Threat-free (15%)' 'Threat-free (15%)')$(Get-Bar 'Device activity (10%)' 'Device activity (10%)')$(Get-Bar 'Management health (10%)' 'Management health (10%)')</div>
 </div>
-<div style='margin-top:16px;padding:12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px'><strong>Operational focus:</strong> $(Get-Metric 'Non-Compliant Devices') non-compliant devices, $(Get-Metric 'Unencrypted Devices') unencrypted devices, $(Get-Metric 'Stale / Inactive Devices') stale devices, $(Get-Metric 'Orphaned Devices') orphaned devices, $(Get-Metric 'Low Storage (<10%)') devices below 10% free storage, and $(Get-Metric 'Applications') applications tracked.</div>
+<div style='margin-top:18px;padding:14px;background:#17212b;border:1px solid #2a3742;border-radius:8px;color:#8b98a5'><strong style='color:#e6edf3'>Risk definitions:</strong> High means a device risk score of 4 or higher; Medium means a score of 2-3. Scores combine threat severity, jailbreak/root status, encryption, compliance, wipe state, and inactivity. This is a device count, not a user count. <br><strong style='color:#e6edf3'>Operational focus:</strong> $(Get-Metric 'Non-Compliant Devices') non-compliant, $(Get-Metric 'Unencrypted Devices') unencrypted, $(Get-Metric 'Stale / Inactive Devices') stale, $(Get-Metric 'Orphaned Devices') orphaned, $(Get-Metric 'Low Storage (<10%)') below 10% free storage, and $(Get-Metric 'Applications') applications tracked.</div>
 </div>
 "@
     $sectionNumber = $page.Sections.Count + 1
