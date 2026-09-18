@@ -36,7 +36,7 @@ function Convert-FieldNameToDisplayName {
 }
 
 foreach ($listName in $listNames) {
-    $fields = Get-PnPField -List $listName
+    $fields = Get-PnPField -List $listName | Where-Object { $_.CanBeDeleted -eq $true }
     foreach ($field in $fields) {
         if ($field.InternalName -in @("ContentType", "Attachments", "_UIVersionString")) { continue }
         $displayName = Convert-FieldNameToDisplayName $field.InternalName
