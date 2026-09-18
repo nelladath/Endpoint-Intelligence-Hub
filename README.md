@@ -57,6 +57,7 @@ The SharePoint lists are a **current-state mirror**, not a historical warehouse.
 | `error_catalog.py` | Known application deployment errors and recommendations |
 | `setup_sharepoint_lists.ps1` | Idempotent creation/repair of the twelve SharePoint lists |
 | `setup_sharepoint_site.ps1` | Site branding, modern pages, navigation, views, libraries, and embedded list web parts |
+| `set_sharepoint_field_labels.ps1` | Updates existing SharePoint column display labels to readable Title Case without changing internal names |
 | `local.settings.json.example` | Secret-free local configuration template |
 | `host.json` | Azure Functions host configuration |
 | `requirements.txt` | Python dependencies |
@@ -194,6 +195,17 @@ The script creates or repairs these lists:
 12. `Intune Update Ring Inventory`
 
 Copy the twelve list IDs printed at the end. The script is idempotent and preserves existing data.
+
+To update labels on an already provisioned site:
+
+```powershell
+pwsh -NoProfile -File .\set_sharepoint_field_labels.ps1 `
+  -SiteUrl "https://contoso.sharepoint.com/sites/EndpointIntelligenceHub" `
+  -TenantId "<tenant-id>" `
+  -ClientId "<pnp-public-client-id>"
+```
+
+This changes only the visible column titles. Internal names such as `policyName`, `userPrincipalName`, and `lastModifiedDateTime` remain unchanged so the Python pipeline continues to work.
 
 ## 5. Provision the SharePoint Experience
 
