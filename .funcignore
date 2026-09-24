@@ -1,0 +1,12 @@
+.git/
+.github/
+.venv/
+__pycache__/
+local.settings.json
+*.docx
+*.pdf
+*.html
+*.log
+README.md
+setup_sharepoint_lists.ps1
+setup_sharepoint_site.ps1
