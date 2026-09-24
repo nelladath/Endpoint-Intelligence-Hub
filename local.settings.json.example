@@ -1,0 +1,24 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "TENANT_ID": "<azure-ad-tenant-id>",
+    "CLIENT_ID": "<app-registration-client-id>",
+    "CLIENT_SECRET": "<app-registration-client-secret>",
+    "SHAREPOINT_SITE_ID": "<sharepoint-site-id>",
+    "SP_LIST_APPS_ID": "<list-id>",
+    "SP_LIST_COMPLIANCE_ID": "<list-id>",
+    "SP_LIST_CONFIG_PROFILES_ID": "<list-id>",
+    "SP_LIST_PATCH_ID": "<list-id>",
+    "SP_LIST_DEVICES_ID": "<list-id>",
+    "SP_LIST_APP_INVENTORY_ID": "<list-id>",
+    "SP_LIST_AUTOPILOT_ID": "<list-id>",
+    "SP_LIST_DEVICE_RISKS_ID": "<list-id>",
+    "SP_LIST_HEALTH_SUMMARY_ID": "<list-id>"
+    ,"SP_LIST_COMPLIANCE_INVENTORY_ID": "<list-id>"
+    ,"SP_LIST_CONFIGURATION_INVENTORY_ID": "<list-id>"
+    ,"SP_LIST_UPDATE_RING_INVENTORY_ID": "<list-id>"
+    ,"SP_LIST_JSON_EXPORTS_ID": "<list-id>"
+  }
+}

@@ -1,0 +1,21 @@
+# Secrets and local-only configuration
+local.settings.json
+*.bin
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.python_packages/
+
+# Debug and transient run artifacts
+_run_result.json
+_verify_output.txt
+_verify_last_refresh.ps1
+
+# Generated deliverables (regenerate with generate_endpoint_intelligence_hub_sop.ps1)
+Endpoint-Intelligence-Hub-SOP.docx
+
+# Azure Functions local artifacts
+bin/
+obj/
