@@ -74,6 +74,37 @@ function Add-Table {
     $selection.TypeParagraph()
 }
 
+function Add-DiagramBox {
+    param([double]$Left, [double]$Top, [double]$Width, [double]$Height, [string]$Text, [int]$FillColor = 8547344, [int]$FontColor = 16777215)
+    $shape = $document.Shapes.AddShape(5, $Left, $Top, $Width, $Height)
+    $shape.RelativeHorizontalPosition = 1
+    $shape.RelativeVerticalPosition = 1
+    $shape.Left = $Left
+    $shape.Top = $Top
+    $shape.WrapFormat.Type = 3
+    $shape.Fill.ForeColor.RGB = $FillColor
+    $shape.Line.ForeColor.RGB = 0
+    $shape.Line.Weight = 0.75
+    $shape.TextFrame.TextRange.Text = $Text
+    $shape.TextFrame.TextRange.Font.Size = 8
+    $shape.TextFrame.TextRange.Font.Bold = 1
+    $shape.TextFrame.TextRange.Font.Color = $FontColor
+    $shape.TextFrame.TextRange.ParagraphFormat.Alignment = 1
+    $shape.TextFrame.WordWrap = $true
+    $shape.TextFrame.AutoSize = $false
+    return $shape
+}
+
+function Add-DiagramArrow {
+    param([double]$X1, [double]$Y1, [double]$X2, [double]$Y2)
+    $line = $document.Shapes.AddLine($X1, $Y1, $X2, $Y2)
+    $line.RelativeHorizontalPosition = 1
+    $line.RelativeVerticalPosition = 1
+    $line.Line.ForeColor.RGB = 0
+    $line.Line.Weight = 1.25
+    $line.Line.EndArrowheadStyle = 2
+}
+
 try {
     $word = New-Object -ComObject Word.Application
     $word.Visible = $false
@@ -159,12 +190,12 @@ Endpoint Intelligence Hub modern pages and embedded views
     Add-Heading -Text "2.1 Source code" -Level 2
     Add-Table -Headers @("Item", "Current value") -Rows @(
         @("Editable source folder", "C:\Temp\Telemetry"),
-        @("Source control", "No local .git metadata detected; currently not backed by a Git repository"),
+        @("Source control", "Git repository at https://github.com/nelladath/Endpoint-Intelligence-Hub (branch main)"),
         @("Deployment method", "Azure Functions Core Tools: func azure functionapp publish intune-report-func"),
         @("Python dependencies", "azure-functions, msal, requests"),
         @("Local configuration", "local.settings.json; never commit or distribute this file")
     )
-    Add-Paragraph -Text "Operational recommendation: move C:\Temp\Telemetry into a private Azure DevOps or GitHub repository, add local.settings.json and generated package folders to .gitignore, and deploy through a protected CI/CD environment. Azure contains the deployed package, but it should not be treated as the authoritative source repository."
+    Add-Paragraph -Text "The source is version-controlled in Git. .funcignore excludes local-only SharePoint provisioning and verification scripts from the deployed Function package, so only the runtime files (function_app.py, pipeline.py, graph_client.py, intune_collectors.py, intune_analytics.py, patch_compliance.py, sharepoint_sync.py, config.py, error_catalog.py, host.json, requirements.txt) are uploaded to Azure. local.settings.json and generated package folders remain excluded from Git via .gitignore."
 
     Add-Heading -Text "2.2 Current Azure deployment" -Level 2
     Add-Table -Headers @("Setting", "Current value") -Rows @(
@@ -323,7 +354,7 @@ pwsh -NoProfile -File .\verify_sharepoint_site.ps1 `
   -TenantId "<tenant-id>" `
   -ClientId "<pnp-public-client-id>"
 '@
-    Add-Paragraph -Text "Copy the nine list IDs printed by setup_sharepoint_lists.ps1. Rerunning the script is supported; it adds missing lists/fields without deleting existing data."
+    Add-Paragraph -Text "Copy the twelve list IDs printed by setup_sharepoint_lists.ps1 (including Compliance Policy Inventory, Configuration Profile Inventory, and Update Ring Inventory), plus the JSON Exports library ID printed by setup_sharepoint_site.ps1. Rerunning the scripts is supported; they add missing lists/fields/libraries without deleting existing data."
 
     Add-Heading -Text "7.5 Grant Sites.Selected write access" -Level 2
     Add-Paragraph -Text "Grant the Function app write access only to the reporting site. Do not grant Sites.ReadWrite.All unless a documented exception is approved."
@@ -369,7 +400,11 @@ Get-PnPAzureADAppSitePermission `
         @("SP_LIST_APP_INVENTORY_ID", "Intune Application Inventory list ID"),
         @("SP_LIST_AUTOPILOT_ID", "Intune Autopilot list ID"),
         @("SP_LIST_DEVICE_RISKS_ID", "Intune Device Risks list ID"),
-        @("SP_LIST_HEALTH_SUMMARY_ID", "Intune Health Summary list ID")
+        @("SP_LIST_HEALTH_SUMMARY_ID", "Intune Health Summary list ID"),
+        @("SP_LIST_COMPLIANCE_INVENTORY_ID", "Intune Compliance Policy Inventory list ID"),
+        @("SP_LIST_CONFIGURATION_INVENTORY_ID", "Intune Configuration Profile Inventory list ID"),
+        @("SP_LIST_UPDATE_RING_INVENTORY_ID", "Intune Update Ring Inventory list ID"),
+        @("SP_LIST_JSON_EXPORTS_ID", "JSON Exports document library list ID")
     )
     Add-Code -Text @'
 az functionapp config appsettings set `
@@ -388,7 +423,11 @@ az functionapp config appsettings set `
     SP_LIST_APP_INVENTORY_ID=<id> `
     SP_LIST_AUTOPILOT_ID=<id> `
     SP_LIST_DEVICE_RISKS_ID=<id> `
-    SP_LIST_HEALTH_SUMMARY_ID=<id>
+    SP_LIST_HEALTH_SUMMARY_ID=<id> `
+    SP_LIST_COMPLIANCE_INVENTORY_ID=<id> `
+    SP_LIST_CONFIGURATION_INVENTORY_ID=<id> `
+    SP_LIST_UPDATE_RING_INVENTORY_ID=<id> `
+    SP_LIST_JSON_EXPORTS_ID=<id>
 '@
 
     Add-Heading -Text "7.8 Prepare and deploy code" -Level 2
@@ -441,7 +480,7 @@ az functionapp function show `
     Add-Bullets -Items @(
         "Function host state is Running and both triggers are indexed.",
         "HTTP test returns HTTP 200 with reportName Endpoint Intelligence Hub.",
-        "All nine syncResults entries are present and no write failure is reported.",
+        "All twelve syncResults entries are present and no write failure is reported.",
         "Every SharePoint list contains one common LastRunId from the test execution.",
         "Health Summary includes Overall Endpoint Health Score and all six weighted components.",
         "Devices contain encryption, storage, threat, patchStatus, risk, inactivity, join type, and Autopilot fields.",
@@ -508,10 +547,112 @@ az functionapp function show `
         "Entra app owner, credential owner, and expiration date recorded in the approved secret-management system.",
         "Graph admin consent and Sites.Selected site grant verified.",
         "SharePoint site owners and support group assigned.",
-        "Nine list IDs configured in Azure.",
+        "Twelve list IDs plus the JSON Exports library ID configured in Azure.",
         "HTTP and timer tests completed.",
         "Monitoring alert recipients configured.",
         "Quarterly permission, OS-threshold, risk-rule, and credential reviews scheduled."
+    )
+
+    Add-Heading -Text "14. Architecture, Auto-Update Behavior, and AI Integration" -Level 1
+
+    Add-Heading -Text "14.1 How the pipeline keeps itself up to date" -Level 2
+    Add-Paragraph -Text "Endpoint Intelligence Hub requires no manual refresh. Every run, whether started by the daily timer or the on-demand HTTP endpoint, re-executes the entire pipeline from a clean slate and reconciles every destination with the current source of truth:"
+    Add-Steps -Items @(
+        "Azure starts the run at 08:00 UTC daily (IntuneReportTimerTrigger), or an operator/automation calls POST /api/intune-report (IntuneReportHttpTrigger, function-key protected).",
+        "The Function acquires a fresh MSAL app-only Graph token every run; tokens are never cached across runs.",
+        "Collectors pull the current Intune, Autopilot, compliance, configuration, update-ring, and application state directly from Microsoft Graph.",
+        "patch_compliance.py downloads the live Windows 10/11 update-history pages from Microsoft and derives the current month's Patch Tuesday baseline per servicing branch on every run, so the required-build comparison always reflects the latest released security update.",
+        "sharepoint_sync.py stamps every record with the run's unique LastRunId, upserts changed rows by business Key, and deletes any previously-synced row whose Key is absent from the current run (mark-and-sweep). SharePoint therefore always mirrors the latest tenant state rather than accumulating history.",
+        "The pipeline serializes the complete result set to JSON and overwrites EndpointIntelligenceHub_Latest.json in the JSON Exports library. Because that library has versioning enabled, prior runs remain recoverable as file version history even though the current file is always the latest.",
+        "No step depends on any prior run's output, so a failed or skipped run self-heals on the next successful execution without manual intervention."
+    )
+
+    Add-Heading -Text "14.2 Architecture diagram" -Level 2
+    Add-Paragraph -Text "The diagram below shows the full path from trigger to consumption, including the two ways this data can be surfaced to AI assistants."
+    $diagramAnchor = $selection.Range
+    $selection.InsertBreak(7)
+
+    Add-DiagramBox -Left 60 -Top 20 -Width 150 -Height 40 -Text "Daily Timer 08:00 UTC" | Out-Null
+    Add-DiagramBox -Left 260 -Top 20 -Width 150 -Height 40 -Text "HTTP POST /api/intune-report (on-demand)" | Out-Null
+    Add-DiagramBox -Left 110 -Top 90 -Width 260 -Height 45 -Text "Azure Function: intune-report-func (function_app.py -> pipeline.py)" | Out-Null
+    Add-DiagramBox -Left 110 -Top 150 -Width 260 -Height 40 -Text "Microsoft Graph API (fresh MSAL app-only token every run)" | Out-Null
+    Add-DiagramBox -Left 85 -Top 205 -Width 310 -Height 50 -Text "Collectors + Patch Compliance Baseline (intune_collectors.py, patch_compliance.py + live Microsoft Update History)" | Out-Null
+    Add-DiagramBox -Left 85 -Top 270 -Width 310 -Height 45 -Text "Analytics: Risk, Health Score, Status Normalization (intune_analytics.py)" | Out-Null
+    Add-DiagramBox -Left 85 -Top 330 -Width 310 -Height 45 -Text "SharePoint Sync: upsert + mark-and-sweep, one LastRunId per run (sharepoint_sync.py)" | Out-Null
+    Add-DiagramBox -Left 60 -Top 390 -Width 190 -Height 50 -Text "12 SharePoint Lists (current-state mirror)" -FillColor 12419407 | Out-Null
+    Add-DiagramBox -Left 280 -Top 390 -Width 200 -Height 50 -Text "JSON Exports library: EndpointIntelligenceHub_Latest.json" -FillColor 12419407 | Out-Null
+    Add-DiagramBox -Left 60 -Top 455 -Width 190 -Height 55 -Text "Endpoint Intelligence Hub site pages (Home, Patch Compliance, Device/App/Policy Management, ...)" -FillColor 12419407 | Out-Null
+    Add-DiagramBox -Left 280 -Top 455 -Width 200 -Height 55 -Text "Microsoft Copilot Studio (SharePoint knowledge source or Power Automate action)" -FillColor 12419407 | Out-Null
+    Add-DiagramBox -Left 280 -Top 525 -Width 200 -Height 55 -Text "Azure AI Foundry (data source / RAG ingestion via Azure AI Search)" -FillColor 12419407 | Out-Null
+
+    Add-DiagramArrow -X1 135 -Y1 60 -X2 240 -Y2 90 | Out-Null
+    Add-DiagramArrow -X1 335 -Y1 60 -X2 240 -Y2 90 | Out-Null
+    Add-DiagramArrow -X1 240 -Y1 135 -X2 240 -Y2 150 | Out-Null
+    Add-DiagramArrow -X1 240 -Y1 190 -X2 240 -Y2 205 | Out-Null
+    Add-DiagramArrow -X1 240 -Y1 255 -X2 240 -Y2 270 | Out-Null
+    Add-DiagramArrow -X1 240 -Y1 315 -X2 240 -Y2 330 | Out-Null
+    Add-DiagramArrow -X1 240 -Y1 375 -X2 155 -Y2 390 | Out-Null
+    Add-DiagramArrow -X1 240 -Y1 375 -X2 380 -Y2 390 | Out-Null
+    Add-DiagramArrow -X1 155 -Y1 440 -X2 155 -Y2 455 | Out-Null
+    Add-DiagramArrow -X1 380 -Y1 440 -X2 380 -Y2 455 | Out-Null
+    Add-DiagramArrow -X1 380 -Y1 510 -X2 380 -Y2 525 | Out-Null
+
+    $selection.SetRange($diagramAnchor.End, $diagramAnchor.End)
+    $selection.InsertBreak(7)
+
+    Add-Heading -Text "14.3 Detailed reference diagram" -Level 2
+    Add-Paragraph -Text "Text form of the same flow, for copy/paste into tickets or runbooks:"
+    Add-Code -Text @'
+Daily Timer (08:00 UTC)         HTTP POST /api/intune-report
+        |                               |
+        +---------------+---------------+
+                         v
+        Azure Function: intune-report-func
+          function_app.py -> pipeline.py
+                         |
+                         v
+        Microsoft Graph API (fresh MSAL app-only token)
+                         |
+                         v
+  Collectors (intune_collectors.py)
+  + Patch Compliance Baseline (patch_compliance.py
+    downloads live Microsoft Update History every run)
+                         |
+                         v
+  Analytics: risk, health score, status normalization
+             (intune_analytics.py)
+                         |
+                         v
+  SharePoint Sync: upsert + mark-and-sweep, one LastRunId
+             (sharepoint_sync.py)
+                         |
+           +-------------+-------------+
+           v                           v
+  12 SharePoint Lists          JSON Exports library
+  (current-state mirror)       EndpointIntelligenceHub_Latest.json
+           |                           |
+           v                           +-------------------+
+  Endpoint Intelligence Hub            v                   v
+  site pages (Home, Patch      Copilot Studio        Azure AI Foundry
+  Compliance, Device/App/      (SharePoint knowledge  (data source /
+  Policy Management, ...)      source or Power        RAG ingestion via
+                                Automate action)       Azure AI Search)
+'@
+
+    Add-Heading -Text "14.4 Using this data in Microsoft Copilot Studio" -Level 2
+    Add-Bullets -Items @(
+        "Simplest path: add the Endpoint Intelligence Hub SharePoint site (or specific lists such as Intune Devices and Intune Patch Compliance) as a knowledge source on a Copilot Studio agent. Copilot Studio's SharePoint knowledge source natively grounds answers in list items without any custom code.",
+        "For structured, deterministic answers (for example, exact current compliance percentages), add a Power Automate flow as a custom action/tool: the flow uses the SharePoint 'Get file content' action to read EndpointIntelligenceHub_Latest.json from the JSON Exports library, or the 'Get items' action against a specific list, and returns the parsed values to the agent.",
+        "Because the JSON file and every list are overwritten in place on each run, no separate sync step is required between this pipeline and Copilot Studio; the agent always reads the latest values on its next call.",
+        "Scope the agent's SharePoint connection to the Endpoint Intelligence Hub site only, consistent with the least-privilege posture used for the Function's own Sites.Selected grant."
+    )
+
+    Add-Heading -Text "14.5 Using this data in Azure AI Foundry" -Level 2
+    Add-Bullets -Items @(
+        "Add EndpointIntelligenceHub_Latest.json as a data source for an Azure AI Foundry agent's retrieval-augmented generation ('Add your data'), backed by an Azure AI Search index over the JSON content, so the agent can answer natural-language questions about current devices, compliance, patch status, and risk.",
+        "Because the file changes daily, schedule the Azure AI Search indexer (or a small Azure Function/Logic App triggered after the pipeline completes) to re-index the file on the same 08:00 UTC cadence, keeping the Foundry agent's grounding data current within one indexing cycle of each pipeline run.",
+        "Alternatively, expose the SharePoint lists directly as a custom tool/skill in a Foundry agent using the same Microsoft Graph application permissions already granted to this Function, if per-list querying is preferred over a single JSON blob.",
+        "Treat the JSON export the same as the SharePoint lists from a governance standpoint: it contains device and compliance data, not credentials, but access should still be limited to the Foundry resource's managed identity or a scoped service principal."
     )
 
     Add-Heading -Text "Appendix A. Current Source Files" -Level 1
@@ -523,12 +664,17 @@ az functionapp function show `
         "host.json",
         "intune_analytics.py",
         "intune_collectors.py",
+        "patch_compliance.py",
         "pipeline.py",
         "requirements.txt",
-        "setup_sharepoint_lists.ps1",
-        "setup_sharepoint_site.ps1",
         "sharepoint_sync.py",
-        "verify_sharepoint_site.ps1"
+        ".funcignore (limits the deployed Function package to the runtime files above)",
+        "setup_sharepoint_lists.ps1 (local-only; excluded from the Function package)",
+        "setup_sharepoint_site.ps1 (local-only; excluded from the Function package)",
+        "verify_sharepoint_site.ps1 (local-only; excluded from the Function package)",
+        "publish_json_export.ps1 (local-only; ad hoc JSON export without waiting for a scheduled run)",
+        "refresh_patch_compliance.ps1 (local-only; ad hoc patch compliance recalculation)",
+        "generate_endpoint_intelligence_hub_sop.ps1 (local-only; regenerates this document)"
     )
 
     Add-Heading -Text "Appendix B. Important Design Boundaries" -Level 1
