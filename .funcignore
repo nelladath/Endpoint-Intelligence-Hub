@@ -10,3 +10,16 @@ local.settings.json
 README.md
 setup_sharepoint_lists.ps1
 setup_sharepoint_site.ps1
+verify_sharepoint_site.ps1
+publish_json_export.ps1
+refresh_patch_compliance.ps1
+generate_endpoint_intelligence_hub_sop.ps1
+fix_sharepoint_report_views.ps1
+set_sharepoint_field_labels.ps1
+repair_home_dashboard.ps1
+verify_home_dashboard.ps1
+verify_home_dashboard_table.ps1
+verify_report_view_limits.ps1
+verify_report_views.ps1
+SECURITY.md
+.gitignore
