@@ -33,7 +33,7 @@ $listDefinitions = [ordered]@{
         "deviceId", "deviceName", "userId", "userPrincipalName", "operatingSystem", "osVersion",
         "manufacturer", "model", "serialNumber", "complianceState", "managementState", "enrollmentType",
         "jailBroken", "isEncrypted", "totalStorageSpaceInBytes", "freeStorageSpaceInBytes",
-        "storagePercentFree", "storageHealth", "threatState", "daysInactive", "isStale", "patchStatus",
+        "storagePercentFree", "storageHealth", "threatState", "daysInactive", "isStale",
         "riskScore", "riskLevel", "riskReasons", "gracePeriodExpirationDateTime",
         "managementCertExpirationDate", "certificateStatus", "azureAdDeviceId", "ownerType",
         "managementAgent", "autopilotEnrolled", "approvalPending", "joinType", "physicalMemoryInBytes",
@@ -117,6 +117,12 @@ foreach ($listName in $listDefinitions.Keys) {
         }
     }
     Set-PnPList -Identity $listName -ListExperience NewExperience | Out-Null
+}
+
+$obsoleteDeviceField = Get-PnPField -List "Intune Devices" -Identity "patchStatus" -ErrorAction SilentlyContinue
+if ($obsoleteDeviceField) {
+    Remove-PnPField -List "Intune Devices" -Identity "patchStatus" -Force
+    Write-Host "Removed obsolete 'patchStatus' from 'Intune Devices'"
 }
 
 Write-Host "`n--- Azure Function App settings ---"

@@ -39,6 +39,24 @@ def _parse_datetime(value: str | None) -> datetime | None:
         return None
 
 
+def format_utc_display(value: Any) -> Any:
+    """Render Graph timestamps as readable UTC values for SharePoint and JSON consumers."""
+    if not isinstance(value, str) or not value:
+        return value
+    parsed = _parse_datetime(value)
+    if parsed is None:
+        return value
+    return parsed.astimezone(timezone.utc).strftime("%m/%d/%Y %I:%M %p UTC")
+
+
+def format_record_datetimes(records: list[dict[str, Any]]) -> None:
+    """Format timestamp fields after all calculations that require ISO values are complete."""
+    for record in records:
+        for key, value in list(record.items()):
+            if key.endswith("DateTime") or key in {"lastCheckIn", "evaluatedAtUtc"}:
+                record[key] = format_utc_display(value)
+
+
 def classify_os_currency(operating_system: str | None, os_version: str | None) -> str:
     """Classify Windows servicing currency; non-Windows platforms are treated as current."""
     if (operating_system or "").lower() != "windows":
@@ -371,7 +389,7 @@ def build_report(
     """
     return {
         "runId": str(uuid.uuid4()),
-        "generatedAtUtc": datetime.now(timezone.utc).isoformat(),
+        "generatedAtUtc": format_utc_display(datetime.now(timezone.utc).isoformat()),
         "summary": {
             "apps": summarize_domain(apps, "installState"),
             "compliancePolicies": summarize_domain(compliance_policies, "complianceState"),

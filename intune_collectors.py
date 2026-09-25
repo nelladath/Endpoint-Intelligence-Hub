@@ -268,6 +268,23 @@ def collect_managed_devices(client: GraphClient) -> list[dict[str, Any]]:
     devices = client.get_paged(
         f"{GRAPH_BETA_BASE}/deviceManagement/managedDevices", params={"$select": select}
     )
+
+    def display_os_name(value: str | None, version: str | None) -> str:
+        normalized = (value or "").strip().lower()
+        if normalized == "windows":
+            try:
+                build = int((version or "").split(".")[2])
+                return "Windows 11" if build >= 22000 else "Windows 10"
+            except (IndexError, ValueError):
+                return "Windows"
+        if normalized == "ios":
+            return "iOS"
+        if normalized == "macos":
+            return "macOS"
+        if normalized == "android":
+            return "Android"
+        return value or "Other"
+
     for device in devices:
         records.append({
             "key": device["id"],
@@ -275,7 +292,7 @@ def collect_managed_devices(client: GraphClient) -> list[dict[str, Any]]:
             "deviceName": device.get("deviceName"),
             "userId": device.get("userId"),
             "userPrincipalName": device.get("userPrincipalName"),
-            "operatingSystem": device.get("operatingSystem"),
+            "operatingSystem": display_os_name(device.get("operatingSystem"), device.get("osVersion")),
             "osVersion": device.get("osVersion"),
             "manufacturer": device.get("manufacturer"),
             "model": device.get("model"),

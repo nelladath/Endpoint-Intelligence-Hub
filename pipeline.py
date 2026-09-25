@@ -6,7 +6,7 @@ import logging
 
 from config import settings
 from graph_client import GraphClient
-from intune_analytics import build_health_metrics, build_report, enrich_device_health
+from intune_analytics import build_health_metrics, build_report, enrich_device_health, format_record_datetimes
 from intune_collectors import (
     collect_app_deployment_status,
     collect_application_inventory,
@@ -47,6 +47,16 @@ def run_pipeline() -> dict[str, object]:
     autopilot = collect_autopilot_devices(client)
     device_risks = enrich_device_health(devices)
     health_metrics = build_health_metrics(devices, autopilot, application_inventory)
+    for device in devices:
+        device.pop("patchStatus", None)
+
+    # Calculations above use raw Graph timestamps; SharePoint/JSON receive readable UTC values.
+    for records in (
+        apps, compliance_policies, compliance_inventory, config_profiles,
+        configuration_inventory, patch_compliance, update_ring_inventory,
+        devices, application_inventory, autopilot, device_risks,
+    ):
+        format_record_datetimes(records)
 
     report = build_report(
         apps,

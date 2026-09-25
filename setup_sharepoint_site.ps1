@@ -372,7 +372,7 @@ $urls = @{
     JsonExports = Ensure-DocumentLibrary "JSON Exports" "JSONExports"
 }
 
-Set-ReportingView "Intune Devices" @("deviceName", "userPrincipalName", "operatingSystem", "osVersion", "complianceState", "isEncrypted", "storagePercentFree", "threatState", "patchStatus", "riskLevel", "daysInactive", "lastSyncDateTime")
+Set-ReportingView "Intune Devices" @("deviceName", "userPrincipalName", "operatingSystem", "osVersion", "manufacturer", "model", "serialNumber", "complianceState", "isEncrypted", "storagePercentFree", "threatState", "riskLevel", "daysInactive", "lastSyncDateTime", "enrolledDateTime")
 Set-ReportingView "Intune Apps" @("appName", "publisher", "deviceName", "userPrincipalName", "installState", "normalizedStatus", "errorCode", "lastSyncDateTime")
 Set-ReportingView "Intune Compliance Policies" @("policyName", "deviceName", "userPrincipalName", "complianceState", "lastReportedDateTime")
 Set-ReportingView "Intune Config Profiles" @("profileName", "profileType", "deviceName", "userPrincipalName", "status", "lastReportedDateTime")
