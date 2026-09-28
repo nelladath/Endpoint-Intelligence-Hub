@@ -354,6 +354,50 @@ def summarize_domain(records: list[dict[str, Any]], status_field: str) -> dict[s
     }
 
 
+def aggregate_application_deployments(
+    applications: list[dict[str, Any]], deployment_rows: list[dict[str, Any]]
+) -> None:
+    """Add one deployment summary to each application inventory record."""
+    by_app: dict[str, Counter[str]] = defaultdict(Counter)
+    latest_by_app: dict[str, datetime] = {}
+    for row in deployment_rows:
+        app_id = str(row.get("appId") or "")
+        normalized = normalize_status(row.get("installState"))
+        row["normalizedStatus"] = normalized
+        by_app[app_id][normalized] += 1
+        reported = _parse_datetime(row.get("lastSyncDateTime"))
+        if reported and (app_id not in latest_by_app or reported > latest_by_app[app_id]):
+            latest_by_app[app_id] = reported
+
+    for application in applications:
+        app_id = str(application.get("appId") or "")
+        counts = by_app[app_id]
+        total = sum(counts.values())
+        applicable = total - counts["NotApplicable"]
+        success_percentage = counts["Success"] / applicable * 100 if applicable else 0.0
+        failure_percentage = counts["Failed"] / applicable * 100 if applicable else 0.0
+        needs_attention = counts["Failed"] + counts["Pending"] + counts["Unknown"]
+        application.update({
+            "totalDeployments": total,
+            "applicableDeployments": applicable,
+            "successfulDeployments": counts["Success"],
+            "failedDeployments": counts["Failed"],
+            "pendingDeployments": counts["Pending"],
+            "notApplicableDeployments": counts["NotApplicable"],
+            "unknownDeployments": counts["Unknown"],
+            "needsAttention": needs_attention,
+            "successPercentage": round(success_percentage, 1),
+            "failurePercentage": round(failure_percentage, 1),
+            "deploymentHealth": (
+                "No data" if applicable == 0
+                else classify_health(success_percentage / 100)
+            ),
+            "lastDeploymentReportDateTime": (
+                latest_by_app[app_id].isoformat() if app_id in latest_by_app else ""
+            ),
+        })
+
+
 def summarize_patch_compliance(records: list[dict[str, Any]]) -> dict[str, Any]:
     """Summarize only devices with fresh, evaluable patch telemetry in the compliance ratio."""
     counts = Counter(record.get("complianceStatus") or "Unknown" for record in records)

@@ -30,7 +30,7 @@ $listDefinitions = [ordered]@{
         "baselineSourceUrl", "evaluatedAtUtc"
     )
     "Intune Devices" = @(
-        "deviceId", "deviceName", "userId", "userPrincipalName", "operatingSystem", "osVersion",
+        "deviceId", "deviceName", "userId", "userPrincipalName", "operatingSystem", "operatingSystemName", "osVersion",
         "manufacturer", "model", "serialNumber", "complianceState", "managementState", "enrollmentType",
         "jailBroken", "isEncrypted", "totalStorageSpaceInBytes", "freeStorageSpaceInBytes",
         "storagePercentFree", "storageHealth", "threatState", "daysInactive", "isStale",
@@ -41,7 +41,13 @@ $listDefinitions = [ordered]@{
     )
     "Intune Application Inventory" = @(
         "appId", "appName", "appType", "publisher", "displayVersion", "owner", "developer",
-        "publishingState", "isAssigned", "createdDateTime", "lastModifiedDateTime"
+        "description", "informationUrl", "privacyInformationUrl", "notes",
+        "publishingState", "isAssigned", "assignmentCount", "requiredAssignmentCount",
+        "availableAssignmentCount", "uninstallAssignmentCount", "totalDeployments",
+        "applicableDeployments", "successfulDeployments", "failedDeployments",
+        "pendingDeployments", "notApplicableDeployments", "unknownDeployments",
+        "needsAttention", "successPercentage", "failurePercentage", "deploymentHealth",
+        "lastDeploymentReportDateTime", "createdDateTime", "lastModifiedDateTime"
     )
     "Intune Autopilot" = @(
         "autopilotId", "serialNumber", "manufacturer", "model", "groupTag", "enrollmentState",

@@ -11,7 +11,7 @@ Connect-PnPOnline -Url $SiteUrl -OSLogin -ClientId $ClientId -Tenant $TenantId
 
 $web = Get-PnPWeb -Includes WelcomePage,Title,Description
 $pageNames = @(
-    "Autopilot.aspx", "Hardware-Reports.aspx", "Win32-Apps.aspx", "Store-Apps.aspx",
+    "Autopilot.aspx", "Hardware-Reports.aspx",
     "App-Health.aspx", "Security-Baselines.aspx", "Expedite-Updates.aspx", "Patch-Compliance.aspx",
     "Vulnerability-Reports.aspx", "Device-Management.aspx",
     "Application-Management.aspx", "Policy-Management.aspx", "Patch-Management.aspx",

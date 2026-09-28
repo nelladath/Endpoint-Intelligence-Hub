@@ -25,11 +25,19 @@ def _classify_app_type(odata_type: str) -> str:
     return value or "Other"
 
 
+def _sharepoint_text(value: Any, limit: int = 250) -> str:
+    return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
+
+
 def collect_application_inventory(client: GraphClient) -> list[dict[str, Any]]:
     """Application-level inventory, including Win32 and Store classification."""
     records: list[dict[str, Any]] = []
     for app in client.get_paged(f"{GRAPH_BASE}/deviceAppManagement/mobileApps"):
         app_id = app["id"]
+        assignments = list(client.get_paged(
+            f"{GRAPH_BASE}/deviceAppManagement/mobileApps/{app_id}/assignments"
+        ))
+        assignment_intents = [str(assignment.get("intent") or "") for assignment in assignments]
         records.append({
             "key": app_id,
             "appId": app_id,
@@ -39,8 +47,16 @@ def collect_application_inventory(client: GraphClient) -> list[dict[str, Any]]:
             "displayVersion": app.get("displayVersion") or "",
             "owner": app.get("owner") or "",
             "developer": app.get("developer") or "",
+            "description": _sharepoint_text(app.get("description")),
+            "informationUrl": _sharepoint_text(app.get("informationUrl")),
+            "privacyInformationUrl": _sharepoint_text(app.get("privacyInformationUrl")),
+            "notes": _sharepoint_text(app.get("notes")),
             "publishingState": app.get("publishingState") or "",
             "isAssigned": app.get("isAssigned"),
+            "assignmentCount": len(assignments),
+            "requiredAssignmentCount": assignment_intents.count("required"),
+            "availableAssignmentCount": assignment_intents.count("available"),
+            "uninstallAssignmentCount": assignment_intents.count("uninstall"),
             "createdDateTime": app.get("createdDateTime"),
             "lastModifiedDateTime": app.get("lastModifiedDateTime"),
         })
@@ -292,7 +308,10 @@ def collect_managed_devices(client: GraphClient) -> list[dict[str, Any]]:
             "deviceName": device.get("deviceName"),
             "userId": device.get("userId"),
             "userPrincipalName": device.get("userPrincipalName"),
-            "operatingSystem": display_os_name(device.get("operatingSystem"), device.get("osVersion")),
+            "operatingSystem": device.get("operatingSystem"),
+            "operatingSystemName": display_os_name(
+                device.get("operatingSystem"), device.get("osVersion")
+            ),
             "osVersion": device.get("osVersion"),
             "manufacturer": device.get("manufacturer"),
             "model": device.get("model"),

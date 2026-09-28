@@ -18,6 +18,8 @@ Write-Host "Connected. Publishing site pages and navigation..."
 
 Write-Host "Removing superseded pages that duplicate other reporting views..."
 Remove-PnPPage -Identity "Endpoint-Analytics.aspx" -Force -ErrorAction SilentlyContinue
+Remove-PnPPage -Identity "Win32-Apps.aspx" -Force -ErrorAction SilentlyContinue
+Remove-PnPPage -Identity "Store-Apps.aspx" -Force -ErrorAction SilentlyContinue
 
 $hubDescription = "Centralized portal for Microsoft Intune, Windows Autopilot, AI-assisted driver automation, patch management, application delivery, device compliance, endpoint health, security risk, hardware intelligence, and operational analytics."
 
@@ -90,19 +92,30 @@ function Set-ReportingView {
 }
 
 function Add-ReportingListPart {
-    param([string]$PageUrl, [string]$ListTitle)
+    param([string]$PageUrl, [string]$ListTitle, [string]$ViewName = "All Items")
     $pageName = $PageUrl.Split('/')[-1]
     $page = Get-PnPPage -Identity $pageName
     $sectionNumber = $page.Sections.Count + 1
     Add-PnPPageSection -Page $page -SectionTemplate OneColumn | Out-Null
     $list = Get-PnPList -Identity $ListTitle
-    $view = Get-PnPView -List $ListTitle -Identity "All Items"
+    $view = Get-PnPView -List $ListTitle -Identity $ViewName
     Add-PnPPageWebPart -Page $page -DefaultWebPartType List -Section $sectionNumber -Column 1 -WebPartProperties @{
         isDocumentLibrary = $false
         selectedListId = $list.Id.ToString()
         selectedViewId = $view.Id.ToString()
     } | Out-Null
     Set-PnPPage -Identity $pageName -CommentsEnabled:$false -Publish | Out-Null
+}
+
+function Set-AppHealthView {
+    $viewName = "Needs Attention"
+    $existing = Get-PnPView -List "Intune Apps" -Identity $viewName -ErrorAction SilentlyContinue
+    if ($existing) { Remove-PnPView -List "Intune Apps" -Identity $viewName -Force }
+    $query = "<Where><In><FieldRef Name='normalizedStatus'/><Values><Value Type='Text'>Failed</Value><Value Type='Text'>Pending</Value><Value Type='Text'>Unknown</Value></Values></In></Where><OrderBy><FieldRef Name='appName'/></OrderBy>"
+    Add-PnPView -List "Intune Apps" -Title $viewName -Fields @(
+        "appName", "publisher", "deviceName", "userPrincipalName", "normalizedStatus",
+        "installState", "errorCode", "issue", "recommendedSolution", "lastSyncDateTime"
+    ) -Query $query -RowLimit 999 -Paged | Out-Null
 }
 
 <# Superseded dashboard block retained temporarily for traceability.
@@ -353,6 +366,49 @@ $(New-DashboardFooter -Label "Management calculation" -Text "Overall compliance 
     Set-PnPPage -Identity $pageName -CommentsEnabled:$false -Publish | Out-Null
 }
 
+function Add-ApplicationDashboardPart {
+    param([string]$PageUrl)
+    $pageName = $PageUrl.Split('/')[-1]
+    $page = Get-PnPPage -Identity $pageName
+    $items = @(Get-PnPListItem -List "Intune Application Inventory" -PageSize 5000 -Fields @(
+        "isAssigned", "deploymentHealth", "successfulDeployments", "applicableDeployments",
+        "failedDeployments", "pendingDeployments", "unknownDeployments", "appType"
+    ))
+    $total = $items.Count
+    $assigned = @($items | Where-Object { [string]$_.FieldValues.isAssigned -eq "true" }).Count
+    $successful = 0
+    $applicable = 0
+    foreach ($item in $items) {
+        $successful += [double]($item.FieldValues.successfulDeployments -as [double])
+        $applicable += [double]($item.FieldValues.applicableDeployments -as [double])
+    }
+    $successPercentage = if ($applicable -gt 0) { [math]::Round($successful / $applicable * 100, 1) } else { 0 }
+    $needsAttention = @($items | Where-Object {
+        [double]($_.FieldValues.failedDeployments -as [double]) -gt 0 -or
+        [double]($_.FieldValues.pendingDeployments -as [double]) -gt 0 -or
+        [double]($_.FieldValues.unknownDeployments -as [double]) -gt 0
+    }).Count
+    $cards = (New-DashboardCard -Label "APPLICATIONS" -Value "$total" -Subtitle "All managed app types" -AccentColor "#60a5fa") +
+        (New-DashboardCard -Label "ASSIGNED" -Value "$assigned" -Subtitle "Apps with assignments" -AccentColor "#22c55e") +
+        (New-DashboardCard -Label "DEPLOYMENT SUCCESS" -Value "$successPercentage%" -Subtitle "$successful of $applicable applicable installs" -AccentColor "#eab308") +
+        (New-DashboardCard -Label "NEEDS ATTENTION" -Value "$needsAttention" -Subtitle "Apps with failed, pending, or unknown results" -AccentColor "#ef4444")
+    $typeRows = foreach ($group in ($items | Group-Object { $_.FieldValues.appType } | Sort-Object Count -Descending)) {
+        $percentage = if ($total -gt 0) { [math]::Round($group.Count / $total * 100, 1) } else { 0 }
+        $label = if ($group.Name) { $group.Name } else { "Other" }
+        New-DashboardBarRow -Label $label -ValueText "$($group.Count) ($percentage%)" -Percent $percentage -Color "#60a5fa"
+    }
+    $html = @"
+<div style='$($script:DashboardContainerStyle)'>
+$(New-DashboardHeader -Title "Application Management Overview")
+<div style='display:flex;gap:10px;margin-bottom:20px'>$cards</div>
+<div style='font-size:17px;font-weight:700;margin:8px 0'>Application type distribution</div><div>$($typeRows -join "")</div>
+$(New-DashboardFooter -Label "Deployment calculation" -Text "Success percentage is successful / applicable deployment results. Not-applicable outcomes are excluded; failed, pending, and unknown results feed Application Health.")
+</div>
+"@
+    Add-PnPPageTextPart -Page $page -Section 1 -Column 1 -Text $html | Out-Null
+    Set-PnPPage -Identity $pageName -CommentsEnabled:$false -Publish | Out-Null
+}
+
 $urls = @{
     Devices = Get-ListUrl "Intune Devices"
     Apps = Get-ListUrl "Intune Apps"
@@ -372,22 +428,21 @@ $urls = @{
     JsonExports = Ensure-DocumentLibrary "JSON Exports" "JSONExports"
 }
 
-Set-ReportingView "Intune Devices" @("deviceName", "userPrincipalName", "operatingSystem", "osVersion", "manufacturer", "model", "serialNumber", "complianceState", "isEncrypted", "storagePercentFree", "threatState", "riskLevel", "daysInactive", "lastSyncDateTime", "enrolledDateTime")
+Set-ReportingView "Intune Devices" @("deviceName", "userPrincipalName", "operatingSystemName", "osVersion", "manufacturer", "model", "serialNumber", "complianceState", "isEncrypted", "storagePercentFree", "threatState", "riskLevel", "daysInactive", "lastSyncDateTime", "enrolledDateTime")
 Set-ReportingView "Intune Apps" @("appName", "publisher", "deviceName", "userPrincipalName", "installState", "normalizedStatus", "errorCode", "lastSyncDateTime")
 Set-ReportingView "Intune Compliance Policies" @("policyName", "deviceName", "userPrincipalName", "complianceState", "lastReportedDateTime")
 Set-ReportingView "Intune Config Profiles" @("profileName", "profileType", "deviceName", "userPrincipalName", "status", "lastReportedDateTime")
 Set-ReportingView "Intune Patch Compliance" @("deviceName", "userPrincipalName", "osBranch", "installedBuild", "requiredKB", "requiredBuild", "complianceStatus", "lastCheckInDays", "lastCheckIn", "reportingMonth", "baselineSourceUrl")
-Set-ReportingView "Intune Application Inventory" @("appName", "appType", "publisher", "displayVersion", "isAssigned", "publishingState", "lastModifiedDateTime")
+Set-ReportingView "Intune Application Inventory" @("appName", "appType", "publisher", "displayVersion", "isAssigned", "assignmentCount", "requiredAssignmentCount", "availableAssignmentCount", "totalDeployments", "successfulDeployments", "failedDeployments", "pendingDeployments", "successPercentage", "failurePercentage", "deploymentHealth", "needsAttention", "lastDeploymentReportDateTime", "publishingState", "lastModifiedDateTime")
 Set-ReportingView "Intune Autopilot" @("serialNumber", "manufacturer", "model", "groupTag", "enrollmentState", "profileAssignmentStatus", "userPrincipalName", "lastContactedDateTime")
 Set-ReportingView "Intune Device Risks" @("deviceName", "userPrincipalName", "riskLevel", "riskScore", "riskReasons", "daysInactive", "lastSyncDateTime")
 Set-ReportingView "Intune Health Summary" @("category", "metricName", "metricValue", "percentage", "status", "description", "LastRunId")
+Set-AppHealthView
 
 $pageUrls = @{}
 $pageUrls.Autopilot = New-OperationsPage "Autopilot" "Windows Autopilot" "Enrollment readiness, deployment profiles, and provisioning outcomes for corporate Windows devices." @(@{ Title = "Autopilot inventory"; Description = "Registration and profile assignment state."; Links = @(@{ Title = "Open Autopilot records"; Url = $urls.Autopilot; Description = "Serial number, enrollment state, group tag, profile assignment, and last contact." }) })
 $pageUrls.Hardware = New-OperationsPage "Hardware-Reports" "Hardware Reports" "Hardware lifecycle, model distribution, operating system readiness, storage, encryption, and inventory insights." @(@{ Title = "Device health inventory"; Description = "Current hardware and lifecycle telemetry."; Links = @(@{ Title = "Open hardware records"; Url = $urls.Devices; Description = "Model, OS, storage, encryption, ownership, activity, and risk." }) })
-$pageUrls.Win32 = New-OperationsPage "Win32-Apps" "Win32 Apps" "Package ownership, assignment readiness, deployment status, and remediation context for Win32 applications." @(@{ Title = "Application inventory"; Description = "Use App Type to filter Win32 packages."; Links = @(@{ Title = "Open application inventory"; Url = $urls.ApplicationInventory; Description = "Type, publisher, version, assignment, and publishing state." }) })
-$pageUrls.Store = New-OperationsPage "Store-Apps" "Microsoft Store Apps" "Store application inventory, assignments, and deployment outcomes." @(@{ Title = "Store inventory"; Description = "Use App Type to filter Microsoft Store packages."; Links = @(@{ Title = "Open application inventory"; Url = $urls.ApplicationInventory; Description = "Type, publisher, version, assignment, and publishing state." }) })
-$pageUrls.AppHealth = New-OperationsPage "App-Health" "Application Health" "A focused workspace for installation outcomes, errors, pending deployments, and remediation." @(@{ Title = "Deployment health"; Description = "Per-device and per-user installation state."; Links = @(@{ Title = "Open app deployment health"; Url = $urls.Apps; Description = "Installed, pending, failed, and not-applicable outcomes." }) })
+$pageUrls.AppHealth = New-OperationsPage "App-Health" "Application Health" "A remediation workspace containing only failed, pending, and unknown per-device installation outcomes." @(@{ Title = "Remediation queue"; Description = "Investigate actionable application delivery results."; Links = @(@{ Title = "Open all deployment details"; Url = $urls.Apps; Description = "Full per-device deployment evidence, including successful and not-applicable outcomes." }) })
 $pageUrls.Baselines = New-OperationsPage "Security-Baselines" "Security Baselines" "Baseline assignment, deployment posture, conflicts, and endpoint security alignment." @()
 $pageUrls.Expedite = New-OperationsPage "Expedite-Updates" "Expedite Updates" "Track expedited quality update assignments and deployment progress." @()
 $pageUrls.PatchCompliance = New-OperationsPage "Patch-Compliance" "Patch Compliance" "Current-month Windows quality-update compliance measured against Microsoft's official Patch Tuesday baseline, evaluated across every managed device." @()
@@ -405,14 +460,13 @@ $pageUrls.Device = New-OperationsPage "Device-Management" "Device Management" "A
     ) }
 )
 
-$pageUrls.Application = New-OperationsPage "Application-Management" "Application Management" "Application inventory, deployment outcomes, installation health, and remediation in one workspace." @(
-    @{ Title = "Application estate"; Description = "Manage application types and ownership."; Links = @(
-        @{ Title = "Win32 Apps"; Url = $pageUrls.Win32; Description = "Win32 package operations." },
-        @{ Title = "Store Apps"; Url = $pageUrls.Store; Description = "Microsoft Store application operations." }
+$pageUrls.Application = New-OperationsPage "Application-Management" "Application Management" "One inventory for Win32, Microsoft Store, Microsoft 365, iOS, Android, macOS, and other managed apps, with one deployment summary row per application." @(
+    @{ Title = "Application estate"; Description = "Inventory, ownership, assignments, and deployment percentages."; Links = @(
+        @{ Title = "Application Inventory"; Url = $urls.ApplicationInventory; Description = "One row per app with type, version, assignment counts, success/failure percentages, and health." },
+        @{ Title = "Data Exports (CSV/JSON)"; Url = $urls.JsonExports; Description = "Download true CSV files for application and other reports." }
     ) },
-    @{ Title = "Deployment operations"; Description = "Monitor delivery and installation health."; Links = @(
-        @{ Title = "Deployments"; Url = $urls.Apps; Description = "Per-device and per-user deployment status." },
-        @{ Title = "App Health"; Url = $pageUrls.AppHealth; Description = "Failures and remediation context." }
+    @{ Title = "Health and remediation"; Description = "Separate summary reporting from actionable device-level evidence."; Links = @(
+        @{ Title = "Application Health"; Url = $pageUrls.AppHealth; Description = "Only failed, pending, and unknown device outcomes with error and remediation details." }
     ) }
 )
 
@@ -452,7 +506,7 @@ $homeQuickLinks = @(
     ) },
     @{ Title = "Insights and enablement"; Description = "Dashboards, automation, and knowledge."; Links = @(
         @{ Title = "Power BI Dashboards"; Url = $urls.PowerBI; Description = "Published operational dashboards." },
-        @{ Title = "Full Report (JSON)"; Url = $urls.JsonExports; Description = "Download the complete health-check dataset for automation, Power Automate, or Power BI." },
+        @{ Title = "Data Exports (CSV/JSON)"; Url = $urls.JsonExports; Description = "Download true CSV reports or the complete JSON dataset for automation." },
         @{ Title = "AI Driver Automation"; Url = $pageUrls.DriverAutomation; Description = "Driver discovery, targeting, orchestration, and automation assets." },
         @{ Title = "Documentation"; Url = $urls.Documentation; Description = "Operating procedures and reference material." }
     ) }
@@ -465,10 +519,9 @@ Add-ReportingListPart $pageUrls.Home "Intune Health Summary"
 Add-ReportingListPart $pageUrls.Device "Intune Devices"
 Add-ReportingListPart $pageUrls.Autopilot "Intune Autopilot"
 Add-ReportingListPart $pageUrls.Hardware "Intune Devices"
+Add-ApplicationDashboardPart $pageUrls.Application
 Add-ReportingListPart $pageUrls.Application "Intune Application Inventory"
-Add-ReportingListPart $pageUrls.Win32 "Intune Application Inventory"
-Add-ReportingListPart $pageUrls.Store "Intune Application Inventory"
-Add-ReportingListPart $pageUrls.AppHealth "Intune Apps"
+Add-ReportingListPart $pageUrls.AppHealth "Intune Apps" "Needs Attention"
 Add-PatchComplianceDashboardPart $pageUrls.PatchCompliance
 Add-ReportingListPart $pageUrls.PatchCompliance "Intune Patch Compliance"
 Add-ReportingListPart $pageUrls.Vulnerability "Intune Device Risks"
@@ -489,10 +542,8 @@ Add-PnPNavigationNode -Location QuickLaunch -Parent $deviceNode -Title "Autopilo
 Add-PnPNavigationNode -Location QuickLaunch -Parent $deviceNode -Title "Hardware Reports" -Url $pageUrls.Hardware | Out-Null
 
 $appNode = Add-PnPNavigationNode -Location QuickLaunch -Title "Application Management" -Url $pageUrls.Application
-Add-PnPNavigationNode -Location QuickLaunch -Parent $appNode -Title "Win32 Apps" -Url $pageUrls.Win32 | Out-Null
-Add-PnPNavigationNode -Location QuickLaunch -Parent $appNode -Title "Store Apps" -Url $pageUrls.Store | Out-Null
-Add-PnPNavigationNode -Location QuickLaunch -Parent $appNode -Title "Deployments" -Url $urls.Apps | Out-Null
-Add-PnPNavigationNode -Location QuickLaunch -Parent $appNode -Title "App Health" -Url $pageUrls.AppHealth | Out-Null
+Add-PnPNavigationNode -Location QuickLaunch -Parent $appNode -Title "Application Inventory" -Url $urls.ApplicationInventory | Out-Null
+Add-PnPNavigationNode -Location QuickLaunch -Parent $appNode -Title "Application Health" -Url $pageUrls.AppHealth | Out-Null
 
 $policyNode = Add-PnPNavigationNode -Location QuickLaunch -Title "Policy Management" -Url $pageUrls.Policy
 Add-PnPNavigationNode -Location QuickLaunch -Parent $policyNode -Title "Configuration Profiles" -Url $urls.Configuration | Out-Null
@@ -506,7 +557,7 @@ Add-PnPNavigationNode -Location QuickLaunch -Parent $patchNode -Title "Expedite 
 Add-PnPNavigationNode -Location QuickLaunch -Parent $patchNode -Title "Vulnerability Reports" -Url $pageUrls.Vulnerability | Out-Null
 
 Add-PnPNavigationNode -Location QuickLaunch -Title "Power BI Dashboards" -Url $urls.PowerBI | Out-Null
-Add-PnPNavigationNode -Location QuickLaunch -Title "Full Report (JSON)" -Url $urls.JsonExports | Out-Null
+Add-PnPNavigationNode -Location QuickLaunch -Title "Data Exports (CSV/JSON)" -Url $urls.JsonExports | Out-Null
 Add-PnPNavigationNode -Location QuickLaunch -Title "AI Driver Automation" -Url $pageUrls.DriverAutomation | Out-Null
 Add-PnPNavigationNode -Location QuickLaunch -Title "Documentation" -Url $urls.Documentation | Out-Null
 

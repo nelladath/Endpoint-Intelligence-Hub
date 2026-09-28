@@ -97,7 +97,8 @@ class GraphClient:
         return responses
 
     def upload_file_to_list_drive(
-        self, site_id: str, list_id: str, file_name: str, content: bytes
+        self, site_id: str, list_id: str, file_name: str, content: bytes,
+        content_type: str = "application/octet-stream",
     ) -> dict[str, Any]:
         """Upload (overwrite) a file into the document library backing a SharePoint list."""
         drive = self._request("GET", f"{GRAPH_BASE}/sites/{site_id}/lists/{list_id}/drive").json()
@@ -106,6 +107,7 @@ class GraphClient:
             "PUT",
             f"{GRAPH_BASE}/drives/{drive_id}/root:/{file_name}:/content",
             data=content,
+            headers={"Content-Type": content_type},
         )
         return response.json()
 
