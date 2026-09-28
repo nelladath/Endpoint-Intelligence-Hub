@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import json
 import logging
-import csv
-import io
 
 from config import settings
 from graph_client import GraphClient
@@ -37,24 +35,6 @@ REPORT_DESCRIPTION = (
 )
 
 logger = logging.getLogger("endpoint_intelligence_hub")
-
-
-def records_to_csv(records: list[dict[str, object]]) -> bytes:
-    """Serialize flat report records as an Excel-friendly UTF-8 CSV."""
-    if not records:
-        return b""
-    field_names = list(dict.fromkeys(
-        key for record in records for key in record if key != "key"
-    ))
-    output = io.StringIO(newline="")
-    writer = csv.DictWriter(output, fieldnames=field_names, extrasaction="ignore")
-    writer.writeheader()
-    for record in records:
-        writer.writerow({
-            key: json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else value
-            for key, value in record.items() if key != "key"
-        })
-    return output.getvalue().encode("utf-8-sig")
 
 
 def run_pipeline() -> dict[str, object]:
@@ -181,25 +161,6 @@ def run_pipeline() -> dict[str, object]:
         json.dumps(json_export, indent=2, default=str).encode("utf-8"),
         "application/json",
     )
-    csv_exports = {
-        "Application_Inventory.csv": application_inventory,
-        "Application_Health_Details.csv": apps,
-        "Devices.csv": devices,
-        "Patch_Compliance.csv": patch_compliance,
-        "Compliance_Policy_Status.csv": compliance_policies,
-        "Compliance_Policy_Inventory.csv": compliance_inventory,
-        "Configuration_Profile_Status.csv": config_profiles,
-        "Configuration_Profile_Inventory.csv": configuration_inventory,
-        "Update_Ring_Inventory.csv": update_ring_inventory,
-        "Autopilot.csv": autopilot,
-        "Device_Risks.csv": device_risks,
-        "Health_Summary.csv": health_metrics,
-    }
-    for file_name, records in csv_exports.items():
-        client.upload_file_to_list_drive(
-            site_id, list_ids["json_exports"], file_name,
-            records_to_csv(records), "text/csv; charset=utf-8",
-        )
 
     logger.info("%s run %s complete: %s", REPORT_NAME, run_id, sync_results)
     return {

@@ -33,9 +33,9 @@ Microsoft 365, iOS, Android, macOS, and other app types. Each row includes publi
 assignment counts, deployment result counts, success/failure percentages, deployment health,
 and useful metadata such as owner, developer, description, information/privacy URLs, and notes.
 Application Health is deliberately separate and shows only failed, pending, or unknown
-device-level outcomes with errors and remediation guidance. Every pipeline run also writes
-real UTF-8 CSV files for all report domains to the JSON Exports library; SharePoint's native
-"Export to Excel" action remains an `.iqy` web query by Microsoft design.
+device-level outcomes with errors and remediation guidance. Report views hide SharePoint's
+`.iqy` Export to Excel command and expose the native Export CSV command instead. The JSON
+Exports library remains JSON-only for automation and full-report integration.
 
 ## Files
 - `config.py` -- app settings loader

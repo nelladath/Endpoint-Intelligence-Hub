@@ -85,9 +85,34 @@ function Get-ListUrl {
     return "$SiteUrl/$($list.RootFolder.ServerRelativeUrl.TrimStart('/').Split('/', 3)[-1])/AllItems.aspx"
 }
 
+function Set-CsvExportCommand {
+    param([string]$ListTitle, [string]$ViewName)
+    $formatter = [string](@{
+        '$schema' = 'https://developer.microsoft.com/json-schemas/sp/v2/row-formatting.schema.json'
+        commandBarProps = @{
+            commands = @(
+                @{ key = 'exportExcel'; hide = $true },
+                @{
+                    key = 'exportCSV'
+                    text = 'Export CSV'
+                    title = 'Download this report as CSV'
+                    iconName = 'ExcelDocument'
+                    primary = $true
+                    position = 0
+                }
+            )
+        }
+    } | ConvertTo-Json -Depth 6 -Compress)
+    $view = Get-PnPView -List $ListTitle -Identity $ViewName
+    $view.CustomFormatter = $formatter
+    $view.Update()
+    Invoke-PnPQuery
+}
+
 function Set-ReportingView {
     param([string]$ListTitle, [string[]]$Fields)
     Set-PnPView -List $ListTitle -Identity "All Items" -Fields $Fields -Values @{ RowLimit = [uint32]999; Paged = $true } | Out-Null
+    Set-CsvExportCommand -ListTitle $ListTitle -ViewName "All Items"
     Set-PnPList -Identity $ListTitle -ListExperience NewExperience | Out-Null
 }
 
@@ -116,6 +141,17 @@ function Set-AppHealthView {
         "appName", "publisher", "deviceName", "userPrincipalName", "normalizedStatus",
         "installState", "errorCode", "issue", "recommendedSolution", "lastSyncDateTime"
     ) -Query $query -RowLimit 999 -Paged | Out-Null
+    Set-CsvExportCommand -ListTitle "Intune Apps" -ViewName $viewName
+}
+
+function Remove-GeneratedCsvExports {
+    $library = Get-PnPList -Identity "JSON Exports"
+    $folderUrl = $library.RootFolder.ServerRelativeUrl
+    $files = @(Get-PnPFolderItem -FolderSiteRelativeUrl ($folderUrl -replace '^/sites/IntuneReporting/', '') -ItemType File)
+    foreach ($file in $files | Where-Object { $_.Name -like '*.csv' }) {
+        Remove-PnPFile -ServerRelativeUrl "$folderUrl/$($file.Name)" -Force
+        Write-Host "Removed obsolete generated CSV: $($file.Name)"
+    }
 }
 
 <# Superseded dashboard block retained temporarily for traceability.
@@ -437,6 +473,9 @@ Set-ReportingView "Intune Application Inventory" @("appName", "appType", "publis
 Set-ReportingView "Intune Autopilot" @("serialNumber", "manufacturer", "model", "groupTag", "enrollmentState", "profileAssignmentStatus", "userPrincipalName", "lastContactedDateTime")
 Set-ReportingView "Intune Device Risks" @("deviceName", "userPrincipalName", "riskLevel", "riskScore", "riskReasons", "daysInactive", "lastSyncDateTime")
 Set-ReportingView "Intune Health Summary" @("category", "metricName", "metricValue", "percentage", "status", "description", "LastRunId")
+Set-ReportingView "Intune Compliance Policy Inventory" @("policyName", "policyType", "platforms", "technologies", "isAssigned", "roleScopeTagIds", "createdDateTime", "lastModifiedDateTime")
+Set-ReportingView "Intune Configuration Profile Inventory" @("policyName", "policyType", "platforms", "technologies", "isAssigned", "roleScopeTagIds", "createdDateTime", "lastModifiedDateTime")
+Set-ReportingView "Intune Update Ring Inventory" @("policyName", "policyType", "platforms", "technologies", "isAssigned", "roleScopeTagIds", "createdDateTime", "lastModifiedDateTime")
 Set-AppHealthView
 
 $pageUrls = @{}
@@ -463,7 +502,7 @@ $pageUrls.Device = New-OperationsPage "Device-Management" "Device Management" "A
 $pageUrls.Application = New-OperationsPage "Application-Management" "Application Management" "One inventory for Win32, Microsoft Store, Microsoft 365, iOS, Android, macOS, and other managed apps, with one deployment summary row per application." @(
     @{ Title = "Application estate"; Description = "Inventory, ownership, assignments, and deployment percentages."; Links = @(
         @{ Title = "Application Inventory"; Url = $urls.ApplicationInventory; Description = "One row per app with type, version, assignment counts, success/failure percentages, and health." },
-        @{ Title = "Data Exports (CSV/JSON)"; Url = $urls.JsonExports; Description = "Download true CSV files for application and other reports." }
+        @{ Title = "Full Report (JSON)"; Url = $urls.JsonExports; Description = "Download the complete JSON dataset for automation; use Export CSV directly on report views." }
     ) },
     @{ Title = "Health and remediation"; Description = "Separate summary reporting from actionable device-level evidence."; Links = @(
         @{ Title = "Application Health"; Url = $pageUrls.AppHealth; Description = "Only failed, pending, and unknown device outcomes with error and remediation details." }
@@ -506,7 +545,7 @@ $homeQuickLinks = @(
     ) },
     @{ Title = "Insights and enablement"; Description = "Dashboards, automation, and knowledge."; Links = @(
         @{ Title = "Power BI Dashboards"; Url = $urls.PowerBI; Description = "Published operational dashboards." },
-        @{ Title = "Data Exports (CSV/JSON)"; Url = $urls.JsonExports; Description = "Download true CSV reports or the complete JSON dataset for automation." },
+        @{ Title = "Full Report (JSON)"; Url = $urls.JsonExports; Description = "Download the complete JSON dataset for automation." },
         @{ Title = "AI Driver Automation"; Url = $pageUrls.DriverAutomation; Description = "Driver discovery, targeting, orchestration, and automation assets." },
         @{ Title = "Documentation"; Url = $urls.Documentation; Description = "Operating procedures and reference material." }
     ) }
@@ -515,6 +554,7 @@ $homeQuickLinks = @(
 $pageUrls.Home = New-OperationsPage "Endpoint-Intelligence-Hub" "Endpoint Intelligence Hub" $hubDescription @()
 
 Publish-HomePageBody $pageUrls.Home $homeQuickLinks
+Remove-GeneratedCsvExports
 Add-ReportingListPart $pageUrls.Home "Intune Health Summary"
 Add-ReportingListPart $pageUrls.Device "Intune Devices"
 Add-ReportingListPart $pageUrls.Autopilot "Intune Autopilot"
@@ -557,7 +597,7 @@ Add-PnPNavigationNode -Location QuickLaunch -Parent $patchNode -Title "Expedite 
 Add-PnPNavigationNode -Location QuickLaunch -Parent $patchNode -Title "Vulnerability Reports" -Url $pageUrls.Vulnerability | Out-Null
 
 Add-PnPNavigationNode -Location QuickLaunch -Title "Power BI Dashboards" -Url $urls.PowerBI | Out-Null
-Add-PnPNavigationNode -Location QuickLaunch -Title "Data Exports (CSV/JSON)" -Url $urls.JsonExports | Out-Null
+Add-PnPNavigationNode -Location QuickLaunch -Title "Full Report (JSON)" -Url $urls.JsonExports | Out-Null
 Add-PnPNavigationNode -Location QuickLaunch -Title "AI Driver Automation" -Url $pageUrls.DriverAutomation | Out-Null
 Add-PnPNavigationNode -Location QuickLaunch -Title "Documentation" -Url $urls.Documentation | Out-Null
 
